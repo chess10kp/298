@@ -1,0 +1,6 @@
+kagglehub
+fastapi
+fastui
+pandas
+matplotlib
+uvicorn
