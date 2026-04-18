@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if user %}Account{% else %}Login{% endif %} — ride service</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 28rem; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin-top: 0.75rem; }
+    input { width: 100%; padding: 0.4rem; margin-top: 0.25rem; box-sizing: border-box; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    .muted { color: #52525b; font-size: 0.9rem; }
+    .links { margin-top: 1.25rem; line-height: 1.6; }
+    .defaults { margin-top: 1.5rem; padding: 1rem; background: #f4f4f5; border-radius: 8px; font-size: 0.95rem; }
+    .defaults h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .defaults ul { margin: 0; padding-left: 1.2rem; }
+    .defaults li { margin: 0.5rem 0; }
+    .defaults code { font-size: 0.85rem; }
+    .row-btns { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .row-btns button { margin-top: 0; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  {% if user %}
+  <h1>You are signed in</h1>
+  <p class="muted">Session cookie is active. You do not need to log in again.</p>
+  <p><strong>{{ user.email }}</strong> · role: <code>{{ user.role.value }}</code></p>
+  <div class="links">
+    <p><a href="/api/rider/dashboard">Rider profile</a>
+      {% if user.role.value == 'admin' %} · <a href="/api/admin/dashboard">Admin profile</a>{% endif %}
+      · <a href="/driver">Driver map</a></p>
+    <p><a href="{{ next_url }}">Continue to your destination</a> (from <code>next</code> if you used a sign-in link).</p>
+  </div>
+  <p>
+    <button type="button" id="logout-btn">Log out</button>
+  </p>
+  <script>
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/login';
+    });
+  </script>
+  {% else %}
+  <h1>Log in</h1>
+  <p class="muted">Sets an httpOnly session cookie for browser dashboards and the driver map.</p>
+  <form id="login-form">
+    <label>Email <input name="email" id="field-email" type="email" autocomplete="username" required></label>
+    <label>Password <input name="password" id="field-password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Login</button>
+  </form>
+  {% if show_default_hints %}
+  <section class="defaults" aria-label="Default database accounts">
+    <h2>Default accounts (created when the DB is new or reset)</h2>
+    <ul>
+      <li>
+        <strong>Rider profile</strong> — <code>{{ default_rider_email }}</code> / <code>{{ default_rider_password }}</code>
+        <div class="row-btns">
+          <button type="button" id="fill-rider">Fill rider fields</button>
+          <a href="/login?next=/api/rider/dashboard">Open login with rider profile redirect</a>
+        </div>
+      </li>
+      <li>
+        <strong>Admin profile</strong> — <code>{{ default_admin_email }}</code> / <code>{{ default_admin_password }}</code>
+        <div class="row-btns">
+          <button type="button" id="fill-admin">Fill admin fields</button>
+          <a href="/login?next=/api/admin/dashboard">Open login with admin profile redirect</a>
+        </div>
+      </li>
+    </ul>
+    <p class="muted">After login you are sent to the path in <code>next</code> (rider vs admin dashboard).</p>
+  </section>
+  {% endif %}
+  <p class="links">
+    <a href="/api/rider/dashboard">Rider profile</a> · <a href="/api/admin/dashboard">Admin profile</a> · <a href="/driver">Driver map</a>
+  </p>
+  <script>
+    (function () {
+      const nextUrl = {{ next_url | tojson }};
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = { email: fd.get('email'), password: fd.get('password') };
+        const r = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          window.location.href = nextUrl;
+        } else {
+          alert('Login failed');
+        }
+      });
+      {% if show_default_hints %}
+      document.getElementById('fill-rider').addEventListener('click', () => {
+        document.getElementById('field-email').value = {{ default_rider_email | tojson }};
+        document.getElementById('field-password').value = {{ default_rider_password | tojson }};
+      });
+      document.getElementById('fill-admin').addEventListener('click', () => {
+        document.getElementById('field-email').value = {{ default_admin_email | tojson }};
+        document.getElementById('field-password').value = {{ default_admin_password | tojson }};
+      });
+      {% endif %}
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>
