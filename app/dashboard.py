@@ -1,10 +1,12 @@
 """FastUI dashboard for NYC TLC Uber pickup analytics."""
 
-from fastui import AnyComponent, components as c
+from fastui import AnyComponent
+from fastui import components as c
 from fastui.components.display import DisplayLookup
 from fastui.events import GoToEvent
 
 from app.analytics_queries import fetch_overview
+from app.components import build_footer, build_navbar
 from app.config import DB_PATH
 from app.fruger_tailwind import (
     BODY,
@@ -17,6 +19,7 @@ from app.fruger_tailwind import (
     WARN_SOFT,
 )
 from app.schemas.analytics import CountByLabel
+from app.schemas.operational import UserPublic
 
 
 def _open_endpoint_link(text: str, url: str) -> AnyComponent:
@@ -27,18 +30,22 @@ def _open_endpoint_link(text: str, url: str) -> AnyComponent:
     )
 
 
-def build_dashboard() -> list[AnyComponent]:
+def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
     if not DB_PATH.is_file():
         return [
             c.Page(
                 class_name=PAGE,
                 components=[
-                    c.Heading(text="Fruger · NYC pickup analytics", level=1, class_name=H1),
+                    c.Heading(
+                        text="Fruger · NYC pickup analytics", level=1, class_name=H1
+                    ),
+                    build_navbar(user),
                     c.Paragraph(
                         text="Database not found. Start the app once (Kaggle auth or place "
                         "uber-raw-data-apr14.csv under data/) to create fruger.db.",
                         class_name=WARN_SOFT,
                     ),
+                    build_footer(),
                 ],
             )
         ]
@@ -53,7 +60,9 @@ def build_dashboard() -> list[AnyComponent]:
         f"Distinct TLC bases: {t.distinct_bases}",
     ]
 
-    def _table(title: str, rows: list[CountByLabel], max_rows: int = 12) -> list[AnyComponent]:
+    def _table(
+        title: str, rows: list[CountByLabel], max_rows: int = 12
+    ) -> list[AnyComponent]:
         slice_ = rows[:max_rows]
         if not slice_:
             return [
@@ -79,6 +88,7 @@ def build_dashboard() -> list[AnyComponent]:
 
     components: list[AnyComponent] = [
         c.Heading(text="Fruger · NYC Uber pickup analytics", level=1, class_name=H1),
+        build_navbar(user),
         c.Paragraph(
             text="Source: FiveThirtyEight — Uber pickups in New York City "
             "(TLC pickup events; not full trips — no fare, distance, or drop-offs).",
@@ -92,7 +102,9 @@ def build_dashboard() -> list[AnyComponent]:
             ],
         ),
         c.Heading(text="Charts", level=2, class_name=H2),
-        c.Image(src="/api/analytics/plots/borough.png", alt="By borough", class_name=IMG),
+        c.Image(
+            src="/api/analytics/plots/borough.png", alt="By borough", class_name=IMG
+        ),
         c.Image(src="/api/analytics/plots/base.png", alt="By TLC base", class_name=IMG),
         c.Image(src="/api/analytics/plots/hour.png", alt="By hour", class_name=IMG),
         c.Image(
@@ -102,11 +114,12 @@ def build_dashboard() -> list[AnyComponent]:
         ),
     ]
 
-    components.extend(_table("Pickups by borough", overview.by_borough))
     components.extend(_table("Pickups by TLC base", overview.by_base))
     components.extend(_table("Pickups by hour", overview.by_hour))
     components.extend(_table("Top TLC zones", overview.top_zones))
-    components.extend(_table("By data file era (2014 vs 2015)", overview.by_data_source))
+    components.extend(
+        _table("By data file era (2014 vs 2015)", overview.by_data_source)
+    )
     components.extend(_table("Pickups by date (sample)", overview.pickups_by_date))
 
     components.extend(
@@ -114,7 +127,9 @@ def build_dashboard() -> list[AnyComponent]:
             c.Div(
                 class_name="flex flex-wrap gap-3 items-center mt-6",
                 components=[
-                    _open_endpoint_link("NYC overview (JSON API)", "/api/analytics/overview"),
+                    _open_endpoint_link(
+                        "NYC overview (JSON API)", "/api/analytics/overview"
+                    ),
                     _open_endpoint_link("This page as FastUI JSON", "/api/nyc"),
                 ],
             ),
@@ -122,6 +137,7 @@ def build_dashboard() -> list[AnyComponent]:
                 text="Use the buttons to fetch the same data in JSON form.",
                 class_name="text-xs text-fruger-muted mt-2",
             ),
+            build_footer(),
         ]
     )
     return [c.Page(class_name=PAGE, components=components)]

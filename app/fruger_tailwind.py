@@ -3,15 +3,21 @@
 Requires ``tailwind.config`` in :mod:`app.fastui_html` (``fruger`` palette + ``font-display``).
 """
 
+# --- Navbar ---
+NAVBAR = "sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 lg:px-8 h-14 bg-fruger-panel text-fruger-on shadow-sm border-b border-fruger-container"
+
 # --- Layout (full viewport width; horizontal padding only) ---
 PAGE = (
-    "min-h-screen w-full max-w-none bg-fruger-surface px-4 sm:px-6 lg:px-8 py-8 space-y-4 "
+    "min-h-screen w-full max-w-none bg-fruger-surface px-4 sm:px-6 lg:px-8 py-8 pb-24 space-y-4 "
     "text-fruger-on antialiased"
 )
 PAGE_NARROW = (
-    "min-h-screen w-full max-w-none bg-fruger-surface px-4 sm:px-6 lg:px-8 py-8 space-y-3 "
+    "min-h-screen w-full max-w-none bg-fruger-surface px-4 sm:px-6 lg:px-8 py-8 pb-24 space-y-3 "
     "text-fruger-on antialiased"
 )
+
+# --- Footer ---
+FOOTER = "mt-16 pt-12 pb-12 border-t border-fruger-container text-xs text-fruger-muted flex items-center justify-center text-center"
 
 # --- Type ---
 H1 = "font-display text-3xl font-extrabold tracking-tight text-fruger-on"
@@ -21,8 +27,7 @@ LINK = "text-fruger-accent font-semibold hover:underline"
 
 # --- Surfaces (no 1px “template” borders; tonal lift) ---
 CARD = (
-    "block rounded-md bg-fruger-panel p-8 transition-colors "
-    "hover:bg-fruger-container"
+    "block rounded-md bg-fruger-panel p-8 transition-colors hover:bg-fruger-container"
 )
 HERO = "rounded-md bg-gradient-to-br from-fruger to-fruger-dark text-white p-8 mb-6"
 STAT_TILE = "rounded-md bg-fruger-panel p-6 shadow-fruger-float"

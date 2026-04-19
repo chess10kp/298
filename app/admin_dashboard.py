@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastui import AnyComponent, components as c
 from fastui.events import GoToEvent
 
+from app.components import build_footer, build_navbar
 from app.fruger_tailwind import H1, H2, IMG, LINK, PAGE_NARROW as PAGE
-from app.schemas.operational import AdminStatsOut
+from app.schemas.operational import AdminStatsOut, UserPublic
 
 _BODY = "text-fruger-on font-mono text-sm leading-relaxed"
 
@@ -19,7 +20,9 @@ def _nav_link(text: str, url: str) -> AnyComponent:
     )
 
 
-def build_admin_dashboard(stats: AdminStatsOut) -> list[AnyComponent]:
+def build_admin_dashboard(
+    stats: AdminStatsOut, user: UserPublic | None = None
+) -> list[AnyComponent]:
     lines = [
         f"Total rides: {stats.total_rides}",
         f"Total bids: {stats.total_bids}",
@@ -30,6 +33,7 @@ def build_admin_dashboard(stats: AdminStatsOut) -> list[AnyComponent]:
         lines.append(f"  {k}: {v}")
 
     components: list[AnyComponent] = [
+        build_navbar(user),
         c.Heading(text="Fruger admin", level=1, class_name=H1),
         c.Div(
             class_name="flex flex-wrap gap-3",
@@ -59,5 +63,6 @@ def build_admin_dashboard(stats: AdminStatsOut) -> list[AnyComponent]:
                 _nav_link("API docs", "/api/docs"),
             ],
         ),
+        build_footer(),
     ]
     return [c.Page(class_name=PAGE, components=components)]

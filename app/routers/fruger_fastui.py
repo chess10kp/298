@@ -13,6 +13,7 @@ from fastui.events import GoToEvent
 from pydantic import BaseModel
 
 from app.analytics_queries import fetch_overview
+from app.components import build_navbar
 from app.dashboard import build_dashboard
 from app.deps import Conn, get_current_user_optional, get_db_session
 from app.fruger_tailwind import BODY, H1, LINK, PAGE
@@ -69,7 +70,7 @@ def api_root(
 ) -> JSONResponse:
     """Browser ``/`` loads this JSON. Riders see the rider hub; others see the role dashboard."""
     if user is None:
-        return _fastui_json(build_api_home_guest())
+        return _fastui_json(build_api_home_guest(user))
     if user.role == UserRole.rider:
         rides = rides_svc.list_my_rides(conn, user.id)
         return _fastui_json(
@@ -80,9 +81,11 @@ def api_root(
 
 @router.get("/api/nyc")
 @router.get("/api/nyc/")
-def api_nyc_dataset() -> JSONResponse:
+def api_nyc_dataset(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+) -> JSONResponse:
     """Legacy NYC-only FastUI tree (formerly ``GET /api/``)."""
-    return _fastui_json(build_dashboard())
+    return _fastui_json(build_dashboard(user))
 
 
 @router.get("/api/analytics")
@@ -96,6 +99,7 @@ def api_analytics_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="NYC analytics", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="Sign in to view pickup analytics.", class_name=BODY
                         ),
@@ -117,7 +121,7 @@ def api_analytics_page(
             err = str(e)
     else:
         err = "Database file not found. Start the app once to create the SQLite file."
-    return _fastui_json(build_api_analytics(overview, err))
+    return _fastui_json(build_api_analytics(overview, err, user))
 
 
 @router.get("/api/driver")
@@ -132,6 +136,7 @@ def api_driver_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Driver map", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="Sign in with a driver account to open the map.",
                             class_name=BODY,
@@ -152,6 +157,7 @@ def api_driver_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Driver map", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="This surface is only for driver accounts.",
                             class_name=BODY,
@@ -165,7 +171,7 @@ def api_driver_page(
                 )
             ]
         )
-    return _fastui_json(build_driver_fastui(str(request.base_url)))
+    return _fastui_json(build_driver_fastui(str(request.base_url), user))
 
 
 @router.get("/api/admin/map")
@@ -180,6 +186,7 @@ def api_admin_map_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Fleet map", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="Sign in as an administrator to view the fleet map.",
                             class_name=BODY,
@@ -200,6 +207,7 @@ def api_admin_map_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Fleet map", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="The fleet map is only for administrator accounts.",
                             class_name=BODY,
@@ -213,7 +221,7 @@ def api_admin_map_page(
                 )
             ]
         )
-    return _fastui_json(build_admin_map_fastui(str(request.base_url)))
+    return _fastui_json(build_admin_map_fastui(str(request.base_url), user))
 
 
 @router.get("/api/rider/bids")
@@ -228,6 +236,7 @@ def api_rider_bids_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Bids", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="Sign in to view bids on your rides.", class_name=BODY
                         ),
@@ -247,6 +256,7 @@ def api_rider_bids_page(
                     class_name=PAGE,
                     components=[
                         c.Heading(text="Bids", level=1, class_name=H1),
+                        build_navbar(user),
                         c.Paragraph(
                             text="This view is for rider accounts.", class_name=BODY
                         ),
@@ -259,4 +269,4 @@ def api_rider_bids_page(
                 )
             ]
         )
-    return _fastui_json(build_rider_bids_fastui(str(request.base_url)))
+    return _fastui_json(build_rider_bids_fastui(str(request.base_url), user))

@@ -81,6 +81,6 @@ def revenue_plot(conn: Conn, _: AdminUser, svc: Asvc) -> Response:
 
 
 @router.get("/dashboard")
-def admin_dashboard_ui(conn: Conn, _: AdminUser, svc: Asvc) -> JSONResponse:
+def admin_dashboard_ui(conn: Conn, user: AdminUser, svc: Asvc) -> JSONResponse:
     stats = svc.overview_stats(conn)
-    return _fastui_json(build_admin_dashboard(stats))
+    return _fastui_json(build_admin_dashboard(stats, user))

@@ -8,6 +8,7 @@ from fastui import AnyComponent, components as c
 from fastui.components.display import DisplayLookup
 from fastui.events import GoToEvent
 
+from app.components import build_footer, build_navbar
 from app.fruger_tailwind import (
     BODY,
     CARD,
@@ -59,6 +60,8 @@ def build_rider_dashboard(
             c.Page(
                 class_name=PAGE,
                 components=[
+                    c.PageTitle(text="Rider hub — Fruger"),
+                    build_navbar(user),
                     c.Heading(text="Fruger", level=1, class_name=H1),
                     c.Paragraph(
                         text="Sign in to request rides and manage trips.",
@@ -81,6 +84,8 @@ def build_rider_dashboard(
             c.Page(
                 class_name=PAGE,
                 components=[
+                    c.PageTitle(text="Rider hub — Fruger"),
+                    build_navbar(user),
                     c.Heading(text="Fruger", level=1, class_name=H1),
                     c.Paragraph(
                         text=f"Logged in as {user.email} ({user.role.value}). "
@@ -128,6 +133,7 @@ def build_rider_dashboard(
             class_name=PAGE,
             components=[
                 c.PageTitle(text="Rider hub — Fruger"),
+                build_navbar(user),
                 c.Div(
                     class_name=HERO,
                     components=[
@@ -208,6 +214,7 @@ def build_rider_dashboard(
                     ],
                 ),
                 *table,
+                build_footer(),
             ],
         )
     ]

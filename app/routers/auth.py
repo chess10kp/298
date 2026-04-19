@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.deps import Conn, get_auth_service, get_db_session
@@ -105,3 +106,13 @@ def create_session(
 def logout(response: Response) -> dict[str, bool]:
     response.delete_cookie("access_token")
     return {"ok": True}
+
+
+@router.get("/logout")
+def logout_get() -> RedirectResponse:
+    """GET logout for browser navigation — clears cookie and redirects to /login."""
+    from fastapi.responses import RedirectResponse
+
+    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    response.delete_cookie("access_token")
+    return response
