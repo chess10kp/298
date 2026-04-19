@@ -46,6 +46,19 @@ def migrate_db_path(db_path: Path) -> None:
         conn.close()
 
 
+def operational_tables_present(conn: sqlite3.Connection) -> bool:
+    """Return True if all operational ride-hailing tables exist."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT name FROM sqlite_master
+        WHERE type='table' AND name IN ('users', 'rides', 'bids', 'driver_locations')
+        """
+    )
+    found = {row[0] for row in cur.fetchall()}
+    return found == {"users", "rides", "bids", "driver_locations"}
+
+
 def _migrate_1_operational(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """

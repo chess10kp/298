@@ -213,6 +213,23 @@ class DBSession:
         )
         return [dict(r) for r in cur.fetchall()]
 
+    def list_bidder_locations_for_ride(
+        self, conn: sqlite3.Connection, ride_id: int
+    ) -> list[dict[str, Any]]:
+        """Pending bidders on a ride with a known last GPS fix (for rider map pins)."""
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT b.driver_id AS driver_id, dl.lat AS lat, dl.lng AS lng
+            FROM bids b
+            INNER JOIN driver_locations dl ON dl.driver_id = b.driver_id
+            WHERE b.ride_id = ? AND b.status = ?
+            ORDER BY b.driver_id
+            """,
+            (ride_id, BidStatus.pending.value),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
     def get_bid(self, conn: sqlite3.Connection, bid_id: int) -> dict[str, Any] | None:
         cur = conn.cursor()
         cur.execute(
@@ -263,6 +280,21 @@ class DBSession:
         )
         row = cur.fetchone()
         return dict(row) if row else None
+
+    def list_driver_locations_with_email(
+        self, conn: sqlite3.Connection
+    ) -> list[dict[str, Any]]:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT dl.driver_id AS driver_id, u.email AS email,
+                   dl.lat AS lat, dl.lng AS lng, dl.updated_at AS updated_at
+            FROM driver_locations dl
+            JOIN users u ON u.id = dl.driver_id
+            ORDER BY dl.updated_at DESC
+            """
+        )
+        return [dict(r) for r in cur.fetchall()]
 
     # --- admin aggregates ---
     def count_rides_total(self, conn: sqlite3.Connection) -> int:

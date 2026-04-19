@@ -19,9 +19,16 @@ def build_admin_dashboard(stats: AdminStatsOut) -> list[AnyComponent]:
 
     components: list[AnyComponent] = [
         c.Heading(text="Ride-hailing admin", level=1),
+        c.Link(href="/", text="Back to app dashboard"),
+        c.Text(text=" "),
         *[c.Text(text=line) for line in lines],
         c.Heading(text="Revenue by day (UTC)", level=2),
         c.Image(src="/api/admin/plots/revenue.png", alt="Revenue", class_name="img-fluid"),
+        c.Heading(text="Fleet map", level=2),
+        c.Text(
+            text="Live driver positions (last reported GPS) on a map. Requires GOOGLE_MAPS_API_KEY."
+        ),
+        c.Link(href="/admin/map", text="Open partner / fleet map"),
         c.Heading(text="Other", level=2),
         c.Link(href="/api/", text="NYC pickup analytics"),
         c.Text(text=" "),

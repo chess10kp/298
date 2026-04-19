@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}NYC analytics — Ride service{% endblock %}
+{% block extra_css %}
+    .lead { color: var(--muted); font-size: 0.95rem; max-width: 42rem; margin: 0 0 1.5rem; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .kpi .val { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+    .kpi .lbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 0.25rem; }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .chart-card h3 { margin: 0; padding: 0.65rem 1rem; font-size: 0.85rem; font-weight: 600; border-bottom: 1px solid var(--border); background: #f8fafc; }
+    .chart-card img { width: 100%; height: auto; display: block; vertical-align: middle; }
+    details.table-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    details.table-block summary {
+      cursor: pointer;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      list-style: none;
+    }
+    details.table-block summary::-webkit-details-marker { display: none; }
+    details.table-block[open] summary { border-bottom: 1px solid var(--border); }
+    .tbl-wrap { overflow: auto; max-height: 280px; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    table.data th, table.data td { padding: 0.45rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    table.data th { background: #f8fafc; font-weight: 600; position: sticky; top: 0; }
+    .alert {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      padding: 1rem 1.25rem;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+    }
+    .footnote { font-size: 0.8rem; color: var(--muted); margin-top: 2rem; }
+    .footnote a { color: var(--accent); }
+{% endblock %}
+{% block content %}
+  <h1 style="margin: 0 0 0.35rem; font-size: 1.5rem;">NYC Uber pickup analytics</h1>
+  <p class="lead">TLC-style pickup events from the FiveThirtyEight dataset (not full trips: no fare, distance, or drop-offs in the source files).</p>
+
+  {% if analytics_error %}
+  <div class="alert">{{ analytics_error }}</div>
+  {% endif %}
+
+  {% if overview %}
+  <div class="kpi-grid">
+    <div class="kpi"><div class="val">{{ overview.totals.total_pickups }}</div><div class="lbl">Total pickups</div></div>
+    <div class="kpi"><div class="val">{{ overview.totals.pickups_with_latlon }}</div><div class="lbl">With lat/lon (2014)</div></div>
+    <div class="kpi"><div class="val">{{ overview.totals.pickups_with_zone }}</div><div class="lbl">With TLC zone</div></div>
+    <div class="kpi"><div class="val">{{ overview.totals.distinct_bases }}</div><div class="lbl">Distinct bases</div></div>
+  </div>
+
+  <h2 style="font-size:1.1rem;margin:0 0 0.75rem;font-weight:600;">Charts</h2>
+  <div class="chart-grid">
+    <div class="chart-card"><h3>By borough</h3><img src="/api/analytics/plots/borough.png" alt="Pickups by borough" loading="lazy"></div>
+    <div class="chart-card"><h3>By TLC base</h3><img src="/api/analytics/plots/base.png" alt="By base" loading="lazy"></div>
+    <div class="chart-card"><h3>By hour</h3><img src="/api/analytics/plots/hour.png" alt="By hour" loading="lazy"></div>
+    <div class="chart-card"><h3>By date</h3><img src="/api/analytics/plots/pickups-by-date.png" alt="By date" loading="lazy"></div>
+  </div>
+
+  {% macro table_section(title, rows, open_block=false) %}
+  <details class="table-block" {% if open_block %}open{% endif %}>
+    <summary>{{ title }}</summary>
+    <div class="tbl-wrap">
+      <table class="data">
+        <thead><tr><th>Category</th><th>Count</th></tr></thead>
+        <tbody>
+          {% for row in rows[:16] %}
+          <tr><td>{{ row.label }}</td><td>{{ row.count }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% endmacro %}
+
+  <h2 style="font-size:1.1rem;margin:1.25rem 0 0.75rem;font-weight:600;">Data tables</h2>
+  {{ table_section("By borough", overview.by_borough, true) }}
+  {{ table_section("By TLC base", overview.by_base) }}
+  {{ table_section("By hour", overview.by_hour) }}
+  {{ table_section("Top TLC zones", overview.top_zones) }}
+  {{ table_section("By data source era", overview.by_data_source) }}
+  {{ table_section("Pickups by date (sample)", overview.pickups_by_date) }}
+  {% endif %}
+
+  <p class="footnote">JSON API and legacy FastUI shell: <a href="/api/">/api/</a> · Plot endpoints live under <code>/api/analytics/plots/</code>.</p>
+{% endblock %}

@@ -7,7 +7,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import Conn, CurrentUser, DriverUser, RiderUser, get_db_session
-from app.schemas.operational import BidOut, BidPlaceRequest, RideCreate, RideOut, UserRole
+from app.schemas.operational import (
+    BidOut,
+    BidPlaceRequest,
+    BidderLocationOut,
+    RideCreate,
+    RideOut,
+    UserRole,
+)
 from app.services.bidding_service import BiddingService
 from app.services.db_session import DBSession
 from app.services.ride_service import RideService
@@ -93,6 +100,33 @@ def place_bid(
     bids: Bs,
 ) -> BidOut:
     return bids.place_bid(conn, ride_id, driver.id, body)
+
+
+@router.get("/{ride_id}/bidder-locations", response_model=list[BidderLocationOut])
+def bidder_locations_for_ride(
+    ride_id: int,
+    conn: Conn,
+    user: CurrentUser,
+    db: Annotated[DBSession, Depends(get_db_session)],
+) -> list[BidderLocationOut]:
+    ride_row = db.get_ride(conn, ride_id)
+    if ride_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+    if user.role == UserRole.admin:
+        pass
+    elif user.role == UserRole.rider and int(ride_row["rider_id"]) == user.id:
+        pass
+    else:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view bidder pins")
+    rows = db.list_bidder_locations_for_ride(conn, ride_id)
+    return [
+        BidderLocationOut(
+            driver_id=int(r["driver_id"]),
+            lat=float(r["lat"]),
+            lng=float(r["lng"]),
+        )
+        for r in rows
+    ]
 
 
 @router.get("/{ride_id}/bids", response_model=list[BidOut])

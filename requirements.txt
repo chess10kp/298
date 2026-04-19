@@ -4,3 +4,7 @@ fastui
 pandas
 matplotlib
 uvicorn
+python-jose[cryptography]
+passlib
+pytest
+httpx

@@ -27,8 +27,11 @@
   <p><strong>{{ user.email }}</strong> · role: <code>{{ user.role.value }}</code></p>
   <div class="links">
     <p><a href="/api/rider/dashboard">Rider profile</a>
-      {% if user.role.value == 'admin' %} · <a href="/api/admin/dashboard">Admin profile</a>{% endif %}
-      · <a href="/driver">Driver map</a></p>
+      {% if user.role.value == 'admin' %} · <a href="/api/admin/dashboard">Admin profile</a>
+      · <a href="/admin/map">Fleet map</a>{% endif %}
+      {% if user.role.value == 'driver' %} · <a href="/driver">Driver map</a>{% endif %}
+      {% if user.role.value == 'rider' %} · <a href="/rider/bids">Bids</a>{% endif %}
+      </p>
     <p><a href="{{ next_url }}">Continue to your destination</a> (from <code>next</code> if you used a sign-in link).</p>
   </div>
   <p>
@@ -66,6 +69,13 @@
           <a href="/login?next=/api/admin/dashboard">Open login with admin profile redirect</a>
         </div>
       </li>
+      <li>
+        <strong>Driver map</strong> — <code>{{ default_driver_email }}</code> / <code>{{ default_driver_password }}</code>
+        <div class="row-btns">
+          <button type="button" id="fill-driver">Fill driver fields</button>
+          <a href="/login?next=/driver">Open login with driver map redirect</a>
+        </div>
+      </li>
     </ul>
     <p class="muted">After login you are sent to the path in <code>next</code> (rider vs admin dashboard).</p>
   </section>
@@ -100,6 +110,10 @@
       document.getElementById('fill-admin').addEventListener('click', () => {
         document.getElementById('field-email').value = {{ default_admin_email | tojson }};
         document.getElementById('field-password').value = {{ default_admin_password | tojson }};
+      });
+      document.getElementById('fill-driver').addEventListener('click', () => {
+        document.getElementById('field-email').value = {{ default_driver_email | tojson }};
+        document.getElementById('field-password').value = {{ default_driver_password | tojson }};
       });
       {% endif %}
     })();

@@ -61,11 +61,15 @@ def build_rider_dashboard(user: UserPublic | None, rides: list[RideOut]) -> list
         c.Page(
             components=[
                 c.Heading(text=f"Hello, {user.email}", level=1),
+                c.Link(href="/", text="App dashboard"),
+                c.Text(text=" "),
                 c.Text(
                     text="Create rides via POST /api/rides (see API docs). "
                     "Cancel with POST /api/rides/{id}/cancel. Log out with POST /api/auth/logout."
                 ),
                 c.Heading(text="Quick links", level=2),
+                c.Link(href="/rider/bids", text="View and accept bids"),
+                c.Text(text=" "),
                 c.Link(href="/api/docs", text="API docs"),
                 *table,
             ]

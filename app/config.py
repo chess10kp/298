@@ -9,14 +9,24 @@ If download fails (offline / no token), seed falls back to a local CSV under ``d
 
 **Dataset:** FiveThirtyEight — Uber pickups in New York City (US geography, lat/lon in 2014 files).
 
-**Storage:** ``fruger.db`` table ``pickups`` — one row per TLC pickup event (not a full trip record).
+**Storage:** Single SQLite file (default ``fruger.db`` at project root; set ``DATABASE_PATH`` to override).
+Table ``pickups`` holds NYC TLC events when the dataset seed runs.
 """
 
 import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "fruger.db"
+
+# Single SQLite file: operational tables (users, rides, bids, driver_locations) + optional NYC pickups.
+# Override with absolute path or path relative to project root.
+_database_path_env = os.getenv("DATABASE_PATH", "").strip()
+if _database_path_env:
+    _db_candidate = Path(_database_path_env).expanduser()
+    DB_PATH = _db_candidate if _db_candidate.is_absolute() else (ROOT / _db_candidate)
+else:
+    DB_PATH = ROOT / "fruger.db"
+
 DATA_DIR = ROOT / "data"
 
 # https://www.kaggle.com/datasets/fivethirtyeight/uber-pickups-in-new-york-city
@@ -45,6 +55,8 @@ DEFAULT_ADMIN_EMAIL = os.getenv("DEFAULT_ADMIN_EMAIL", "admin@local.dev")
 DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "Adminpass123")
 DEFAULT_RIDER_EMAIL = os.getenv("DEFAULT_RIDER_EMAIL", "rider@local.dev")
 DEFAULT_RIDER_PASSWORD = os.getenv("DEFAULT_RIDER_PASSWORD", "Riderpass123")
+DEFAULT_DRIVER_EMAIL = os.getenv("DEFAULT_DRIVER_EMAIL", "driver@local.dev")
+DEFAULT_DRIVER_PASSWORD = os.getenv("DEFAULT_DRIVER_PASSWORD", "Driverpass123")
 
 # Show default emails/passwords on /login (set false in production)
 SHOW_DEFAULT_ACCOUNT_HINTS = os.getenv("SHOW_DEFAULT_ACCOUNT_HINTS", "true").lower() in (

@@ -93,3 +93,17 @@ class AdminStatsOut(BaseModel):
     rides_by_status: dict[str, int]
     completed_revenue_cents: int
     total_bids: int
+
+
+class DriverLocationOut(BaseModel):
+    driver_id: int
+    email: str
+    lat: float
+    lng: float
+    updated_at: str
+
+
+class BidderLocationOut(BaseModel):
+    driver_id: int
+    lat: float
+    lng: float

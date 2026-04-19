@@ -13,10 +13,11 @@ _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def seed_default_accounts(conn: sqlite3.Connection) -> None:
-    """Ensure default admin and rider users exist (e.g. after DB reset)."""
+    """Ensure default admin, rider, and driver users exist (e.g. after DB reset)."""
     pairs = [
         (app_config.DEFAULT_ADMIN_EMAIL, app_config.DEFAULT_ADMIN_PASSWORD, "admin"),
         (app_config.DEFAULT_RIDER_EMAIL, app_config.DEFAULT_RIDER_PASSWORD, "rider"),
+        (app_config.DEFAULT_DRIVER_EMAIL, app_config.DEFAULT_DRIVER_PASSWORD, "driver"),
     ]
     cur = conn.cursor()
     seen: set[str] = set()
