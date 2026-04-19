@@ -69,7 +69,7 @@
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: 8,
-          fillColor: '#b91c1c',
+          fillColor: '#1a1c1c',
           fillOpacity: 0.9,
           strokeWeight: 1,
           strokeColor: '#fff',
@@ -90,7 +90,7 @@
             icon: {
               path: google.maps.SymbolPath.CIRCLE,
               scale: 7,
-              fillColor: '#2563eb',
+              fillColor: '#0054cb',
               fillOpacity: 0.95,
               strokeWeight: 1,
               strokeColor: '#fff',
@@ -127,19 +127,19 @@
           bidHtml = '<p class="muted">No bids yet.</p>';
         } else {
           bidHtml =
-            '<ul class="bid-list">' +
+            '<ul class="bid-list-ds">' +
             bids
               .map(
                 (b) =>
                   `<li><strong>$${fmtFare(b.fare_cents)}</strong> — driver #${esc(b.driver_id)} · ` +
                   `${esc(b.distance_to_pickup_m)} m · ${esc(b.status)} ` +
-                  `<button type="button" class="accept-btn" data-ride="${ride.id}" data-bid="${b.id}">Accept</button></li>`,
+                  `<button type="button" class="btn btn--secondary accept-btn" data-ride="${ride.id}" data-bid="${b.id}">Accept</button></li>`,
               )
               .join('') +
             '</ul>';
         }
         parts.push(
-          `<section class="ride-card"><h2>Ride #${esc(ride.id)}</h2>` +
+          `<section class="ride-card-ds"><h2>Ride #${esc(ride.id)}</h2>` +
             `<p class="muted">Pickup: ${esc(ride.pickup_lat)}, ${esc(ride.pickup_lng)} · ` +
             `Dropoff: ${esc(ride.dropoff_lat)}, ${esc(ride.dropoff_lng)}</p>` +
             bidHtml +

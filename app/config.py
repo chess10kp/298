@@ -18,6 +18,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+
+def _load_dotenv_files() -> None:
+    """Populate os.environ from project root files (not automatic in Python)."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    # `.env` first, then optional `root.env` (common alternate name) with override.
+    load_dotenv(ROOT / ".env")
+    load_dotenv(ROOT / "root.env", override=True)
+
+
+_load_dotenv_files()
+
 # Single SQLite file: operational tables (users, rides, bids, driver_locations) + optional NYC pickups.
 # Override with absolute path or path relative to project root.
 _database_path_env = os.getenv("DATABASE_PATH", "").strip()
@@ -41,7 +55,7 @@ CSV_FALLBACK = DATA_DIR / "uber-raw-data-apr14.csv"
 # Jan–Jun 2015 file is very large (~20M rows); set True to load it after 2014 files
 NYC_LOAD_2015 = False
 
-# Auth / operational ride-hailing
+# Auth / Fruger operational rides
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-change-in-production")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))

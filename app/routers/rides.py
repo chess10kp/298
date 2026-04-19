@@ -26,7 +26,9 @@ def get_ride_service(db: Annotated[DBSession, Depends(get_db_session)]) -> RideS
     return RideService(db)
 
 
-def get_bidding_service(db: Annotated[DBSession, Depends(get_db_session)]) -> BiddingService:
+def get_bidding_service(
+    db: Annotated[DBSession, Depends(get_db_session)],
+) -> BiddingService:
     return BiddingService(db)
 
 
@@ -83,7 +85,9 @@ def get_ride(
         )
         if cur.fetchone() is not None:
             return out
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view this ride")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view this ride"
+    )
 
 
 @router.post("/{ride_id}/cancel", response_model=RideOut)
@@ -111,13 +115,17 @@ def bidder_locations_for_ride(
 ) -> list[BidderLocationOut]:
     ride_row = db.get_ride(conn, ride_id)
     if ride_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found"
+        )
     if user.role == UserRole.admin:
         pass
     elif user.role == UserRole.rider and int(ride_row["rider_id"]) == user.id:
         pass
     else:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view bidder pins")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view bidder pins"
+        )
     rows = db.list_bidder_locations_for_ride(conn, ride_id)
     return [
         BidderLocationOut(
@@ -140,12 +148,16 @@ def list_bids(
 ) -> list[BidOut]:
     ride_row = db.get_ride(conn, ride_id)
     if ride_row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found"
+        )
     if user.role == UserRole.admin:
         return bids.list_bids_for_ride(conn, ride_id)
     if user.role == UserRole.rider and int(ride_row["rider_id"]) == user.id:
         return bids.list_bids_for_ride(conn, ride_id)
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot list bids")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Cannot list bids"
+    )
 
 
 @router.post("/{ride_id}/bids/{bid_id}/accept", response_model=RideOut)
@@ -157,7 +169,9 @@ def accept_bid(
     bids: Bs,
     rides: Rs,
 ) -> RideOut:
-    _, ride_row = bids.accept_bid(conn, ride_id=ride_id, bid_id=bid_id, rider_id=rider.id)
+    _, ride_row = bids.accept_bid(
+        conn, ride_id=ride_id, bid_id=bid_id, rider_id=rider.id
+    )
     return RideService.ride_from_row(ride_row)
 
 

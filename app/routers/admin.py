@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import Response
-from fastui import AnyComponent, FastUI
+from fastapi.responses import JSONResponse, Response
+from fastui import AnyComponent
+from pydantic import BaseModel
 
 from app.admin_dashboard import build_admin_dashboard
 from app.admin_plots import revenue_by_day_png
@@ -18,11 +19,36 @@ from app.services.db_session import DBSession
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def get_admin_service(db: Annotated[DBSession, Depends(get_db_session)]) -> AdminService:
+def get_admin_service(
+    db: Annotated[DBSession, Depends(get_db_session)],
+) -> AdminService:
     return AdminService(db)
 
 
 Asvc = Annotated[AdminService, Depends(get_admin_service)]
+
+
+def _serialize_val(v: Any) -> Any:
+    if v is None or isinstance(v, (str, int, float, bool)):
+        return v
+    if isinstance(v, (list, tuple)):
+        return [_serialize_val(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _serialize_val(val) for k, val in v.items()}
+    if isinstance(v, BaseModel):
+        return {f: _serialize_val(getattr(v, f, None)) for f in v.model_fields}
+    if hasattr(v, "__str__"):
+        return str(v)
+    return v
+
+
+def _fastui_json(components: list[AnyComponent]) -> JSONResponse:
+    return JSONResponse(
+        [
+            _serialize_val(c.model_dump(exclude_none=True, by_alias=True))
+            for c in components
+        ]
+    )
 
 
 @router.get("/stats", response_model=AdminStatsOut)
@@ -31,7 +57,9 @@ def admin_stats(conn: Conn, _: AdminUser, svc: Asvc) -> AdminStatsOut:
 
 
 @router.get("/driver-locations", response_model=list[DriverLocationOut])
-def admin_driver_locations(conn: Conn, _: AdminUser, db: Annotated[DBSession, Depends(get_db_session)]) -> list[DriverLocationOut]:
+def admin_driver_locations(
+    conn: Conn, _: AdminUser, db: Annotated[DBSession, Depends(get_db_session)]
+) -> list[DriverLocationOut]:
     rows = db.list_driver_locations_with_email(conn)
     return [
         DriverLocationOut(
@@ -52,7 +80,7 @@ def revenue_plot(conn: Conn, _: AdminUser, svc: Asvc) -> Response:
     return Response(content=png, media_type="image/png")
 
 
-@router.get("/dashboard", response_model=FastUI, response_model_exclude_none=True)
-def admin_dashboard_ui(conn: Conn, _: AdminUser, svc: Asvc) -> list[AnyComponent]:
+@router.get("/dashboard")
+def admin_dashboard_ui(conn: Conn, _: AdminUser, svc: Asvc) -> JSONResponse:
     stats = svc.overview_stats(conn)
-    return build_admin_dashboard(stats)
+    return _fastui_json(build_admin_dashboard(stats))

@@ -1,67 +1,23 @@
-"""HTML pages: login and driver map (hybrid UI)."""
+"""Browser routes: FastUI shells (``fruger_prebuilt_html``) and standalone login HTML."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
-import app.config as app_config
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.deps import get_current_user_optional
+from app.fastui_html import fruger_prebuilt_html
+from app.login_html import render_login_page
 from app.schemas.operational import UserPublic, UserRole
 
 router = APIRouter(tags=["pages"])
 
-_tpl = Jinja2Templates(directory=str(app_config.ROOT / "app" / "templates"))
 
+def _shell(title: str) -> HTMLResponse:
+    return HTMLResponse(fruger_prebuilt_html(title=title))
 
-@router.get("/")
-def home_page(
-    request: Request,
-    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
-):
-    if user is None:
-        return RedirectResponse(url="/login?next=/", status_code=status.HTTP_302_FOUND)
-    return _tpl.TemplateResponse(
-        request,
-        "home.html",
-        {"user": user, "nav_active": "home"},
-    )
-
-
-@router.get("/analytics")
-def analytics_page(
-    request: Request,
-    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
-):
-    if user is None:
-        return RedirectResponse(
-            url="/login?next=/analytics",
-            status_code=status.HTTP_302_FOUND,
-        )
-    overview = None
-    analytics_error = None
-    if app_config.DB_PATH.is_file():
-        try:
-            from app.analytics_queries import fetch_overview
-
-            overview = fetch_overview(app_config.DB_PATH)
-        except Exception as e:
-            analytics_error = str(e)
-    else:
-        analytics_error = "Database file not found. Start the app once to create the SQLite file."
-    return _tpl.TemplateResponse(
-        request,
-        "analytics.html",
-        {
-            "user": user,
-            "nav_active": "analytics",
-            "overview": overview,
-            "analytics_error": analytics_error,
-        },
-    )
 
 _DEFAULT_AFTER_LOGIN = "/"
 
@@ -76,88 +32,108 @@ def _safe_next_url(raw: str | None) -> str:
     return _DEFAULT_AFTER_LOGIN
 
 
+@router.get("/")
+def home_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+    if user is None:
+        return RedirectResponse(url="/login?next=/", status_code=status.HTTP_302_FOUND)
+    if user.role == UserRole.rider:
+        return _shell("Rider hub — Fruger")
+    return _shell("Dashboard — Fruger")
+
+
+@router.get("/analytics")
+def analytics_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+    if user is None:
+        return RedirectResponse(
+            url="/login?next=/analytics",
+            status_code=status.HTTP_302_FOUND,
+        )
+    return _shell("NYC analytics — Fruger")
+
+
 @router.get("/login")
 def login_page(
     request: Request,
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ):
     next_url = _safe_next_url(request.query_params.get("next"))
-    cfg = app_config
-    return _tpl.TemplateResponse(
-        request,
-        "login.html",
-        {
-            "user": user,
-            "next_url": next_url,
-            "show_default_hints": cfg.SHOW_DEFAULT_ACCOUNT_HINTS,
-            "default_rider_email": cfg.DEFAULT_RIDER_EMAIL,
-            "default_rider_password": cfg.DEFAULT_RIDER_PASSWORD,
-            "default_admin_email": cfg.DEFAULT_ADMIN_EMAIL,
-            "default_admin_password": cfg.DEFAULT_ADMIN_PASSWORD,
-            "default_driver_email": cfg.DEFAULT_DRIVER_EMAIL,
-            "default_driver_password": cfg.DEFAULT_DRIVER_PASSWORD,
-        },
-    )
+    return HTMLResponse(render_login_page(user=user, next_url=next_url))
 
 
 @router.get("/driver")
-def driver_page(
-    request: Request,
-    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
-):
+def driver_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
     if user is None:
         return RedirectResponse(url="/login?next=/driver", status_code=status.HTTP_302_FOUND)
     if user.role != UserRole.driver:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The driver map is only for ride-share partner (driver) accounts.",
-        )
-    return _tpl.TemplateResponse(
-        request,
-        "driver_map.html",
-        {"maps_key": app_config.GOOGLE_MAPS_API_KEY},
-    )
+        _forbidden_driver()
+    return _shell("Driver — Fruger")
 
 
 @router.get("/admin/map")
-def admin_map_page(
-    request: Request,
-    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
-):
+def admin_map_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
     if user is None:
         return RedirectResponse(
             url="/login?next=/admin/map",
             status_code=status.HTTP_302_FOUND,
         )
     if user.role != UserRole.admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The fleet map is only for administrator accounts.",
+        _forbidden_admin()
+    return _shell("Fleet map — Fruger")
+
+
+@router.get("/rider/dashboard")
+def rider_dashboard_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+    """Legacy URL; rider hub lives at ``/``."""
+    if user is None:
+        return RedirectResponse(
+            url="/login?next=/",
+            status_code=status.HTTP_302_FOUND,
         )
-    return _tpl.TemplateResponse(
-        request,
-        "admin_map.html",
-        {"maps_key": app_config.GOOGLE_MAPS_API_KEY},
-    )
+    if user.role != UserRole.rider:
+        _forbidden_rider()
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/admin/dashboard", response_class=HTMLResponse)
+def admin_dashboard_shell(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+    if user is None:
+        return RedirectResponse(
+            url="/login?next=/admin/dashboard",
+            status_code=status.HTTP_302_FOUND,
+        )
+    if user.role != UserRole.admin:
+        _forbidden_admin()
+    return _shell("Fruger · Admin")
 
 
 @router.get("/rider/bids")
-def rider_bids_page(
-    request: Request,
-    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
-):
+def rider_bids_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
     if user is None:
         return RedirectResponse(
             url="/login?next=/rider/bids",
             status_code=status.HTTP_302_FOUND,
         )
     if user.role != UserRole.rider:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This page is for rider accounts.",
-        )
-    return _tpl.TemplateResponse(
-        request,
-        "rider_bids.html",
-        {"maps_key": app_config.GOOGLE_MAPS_API_KEY},
+        _forbidden_rider()
+    return _shell("Bids — Fruger")
+
+
+def _forbidden_driver() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="The driver map is only for ride-share partner (driver) accounts.",
+    )
+
+
+def _forbidden_admin() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="The fleet map is only for administrator accounts.",
+    )
+
+
+def _forbidden_rider() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="This page is for rider accounts.",
     )

@@ -1,4 +1,4 @@
-"""Pydantic models for ride-hailing API."""
+"""Pydantic models for the Fruger rides API."""
 
 from enum import Enum
 

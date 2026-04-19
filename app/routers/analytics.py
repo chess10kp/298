@@ -92,4 +92,6 @@ def plot_payment_alias() -> RedirectResponse:
 
 @router.get("/plots/timeline.png")
 def plot_timeline_alias() -> RedirectResponse:
-    return RedirectResponse(url="/api/analytics/plots/pickups-by-date.png", status_code=307)
+    return RedirectResponse(
+        url="/api/analytics/plots/pickups-by-date.png", status_code=307
+    )

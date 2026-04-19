@@ -47,7 +47,7 @@ def migrate_db_path(db_path: Path) -> None:
 
 
 def operational_tables_present(conn: sqlite3.Connection) -> bool:
-    """Return True if all operational ride-hailing tables exist."""
+    """Return True if all Fruger operational tables exist."""
     cur = conn.cursor()
     cur.execute(
         """
