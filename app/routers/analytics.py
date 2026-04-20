@@ -13,7 +13,7 @@ from app.analytics_queries import fetch_overview
 from app.config import DB_PATH
 from app.schemas.analytics import NycOverviewResponse
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
 
 def _db_path() -> Path:

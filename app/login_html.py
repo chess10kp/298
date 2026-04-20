@@ -65,7 +65,7 @@ def render_login_page(
     </div>
     <script>
       document.getElementById('logout-btn').addEventListener('click', async () => {{
-        await fetch('/api/auth/logout', {{ method: 'POST', credentials: 'include' }});
+        await fetch('/api/v1/auth/logout', {{ method: 'POST', credentials: 'include' }});
         window.location.href = '/login';
       }});
     </script>
@@ -165,7 +165,7 @@ def render_login_page(
           e.preventDefault();
           const fd = new FormData(e.target);
           const body = {{ email: fd.get('email'), password: fd.get('password') }};
-          const r = await fetch('/api/auth/session', {{
+          const r = await fetch('/api/v1/auth/session', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
             credentials: 'include',

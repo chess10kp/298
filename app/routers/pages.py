@@ -42,7 +42,9 @@ def home_page(user: Annotated[UserPublic | None, Depends(get_current_user_option
 
 
 @router.get("/analytics")
-def analytics_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+def analytics_page(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
     if user is None:
         return RedirectResponse(
             url="/login?next=/analytics",
@@ -63,14 +65,18 @@ def login_page(
 @router.get("/driver")
 def driver_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
     if user is None:
-        return RedirectResponse(url="/login?next=/driver", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(
+            url="/login?next=/driver", status_code=status.HTTP_302_FOUND
+        )
     if user.role != UserRole.driver:
         _forbidden_driver()
     return _shell("Driver — Fruger")
 
 
 @router.get("/admin/map")
-def admin_map_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+def admin_map_page(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
     if user is None:
         return RedirectResponse(
             url="/login?next=/admin/map",
@@ -82,7 +88,9 @@ def admin_map_page(user: Annotated[UserPublic | None, Depends(get_current_user_o
 
 
 @router.get("/rider/dashboard")
-def rider_dashboard_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+def rider_dashboard_page(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
     """Legacy URL; rider hub lives at ``/``."""
     if user is None:
         return RedirectResponse(
@@ -95,7 +103,9 @@ def rider_dashboard_page(user: Annotated[UserPublic | None, Depends(get_current_
 
 
 @router.get("/admin/dashboard", response_class=HTMLResponse)
-def admin_dashboard_shell(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+def admin_dashboard_shell(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
     if user is None:
         return RedirectResponse(
             url="/login?next=/admin/dashboard",
@@ -107,7 +117,9 @@ def admin_dashboard_shell(user: Annotated[UserPublic | None, Depends(get_current
 
 
 @router.get("/rider/bids")
-def rider_bids_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
+def rider_bids_page(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
     if user is None:
         return RedirectResponse(
             url="/login?next=/rider/bids",

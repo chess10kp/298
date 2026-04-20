@@ -36,9 +36,13 @@ class BiddingService:
     ) -> BidOut:
         ride = self._db.get_ride(conn, ride_id)
         if ride is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found"
+            )
         if str(ride["status"]) != RideStatus.bidding_open.value:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bidding is closed")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Bidding is closed"
+            )
         loc = self._db.get_driver_location(conn, driver_id)
         if loc is None:
             raise HTTPException(
@@ -63,7 +67,9 @@ class BiddingService:
         assert row is not None
         return self._bid_out(row)
 
-    def list_bids_for_ride(self, conn: sqlite3.Connection, ride_id: int) -> list[BidOut]:
+    def list_bids_for_ride(
+        self, conn: sqlite3.Connection, ride_id: int
+    ) -> list[BidOut]:
         rows = self._db.list_bids_for_ride(conn, ride_id)
         return [self._bid_out(r) for r in rows]
 
@@ -77,9 +83,13 @@ class BiddingService:
     ) -> tuple[BidOut, dict]:
         ride = self._db.get_ride(conn, ride_id)
         if ride is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found"
+            )
         if int(ride["rider_id"]) != rider_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your ride")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not your ride"
+            )
         if str(ride["status"]) != RideStatus.bidding_open.value:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -87,9 +97,13 @@ class BiddingService:
             )
         bid = self._db.get_bid(conn, bid_id)
         if bid is None or int(bid["ride_id"]) != ride_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bid not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Bid not found"
+            )
         if str(bid["status"]) != BidStatus.pending.value:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bid is not pending")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Bid is not pending"
+            )
 
         self._db.accept_bid_row(conn, bid_id)
         self._db.reject_other_bids(conn, ride_id, bid_id)
@@ -104,3 +118,46 @@ class BiddingService:
         ride_row = self._db.get_ride(conn, ride_id)
         assert row is not None and ride_row is not None
         return self._bid_out(row), ride_row
+
+    def route_driver(self, conn: sqlite3.Connection, bid_id: int) -> dict:
+        """Return a mocked directions payload from driver last-known location to pickup.
+
+        This is a lightweight server-side placeholder so clients can render a route
+        without requiring an external Google Directions call. The payload contains
+        origin, destination, distance_m and eta_minutes.
+        """
+        bid = self._db.get_bid(conn, bid_id)
+        if bid is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Bid not found"
+            )
+        ride = self._db.get_ride(conn, int(bid["ride_id"]))
+        if ride is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found"
+            )
+        loc = self._db.get_driver_location(conn, int(bid["driver_id"]))
+        if loc is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Driver location unknown",
+            )
+        # simple straight-line distance and ETA by assuming 40 km/h (~11.11 m/s)
+        dist = haversine_m(
+            float(loc["lat"]),
+            float(loc["lng"]),
+            float(ride["pickup_lat"]),
+            float(ride["pickup_lng"]),
+        )
+        speed_m_s = 11.11
+        eta_minutes = max(1, int(dist / speed_m_s / 60))
+        return {
+            "origin": {"lat": float(loc["lat"]), "lng": float(loc["lng"])},
+            "destination": {
+                "lat": float(ride["pickup_lat"]),
+                "lng": float(ride["pickup_lng"]),
+            },
+            "distance_m": float(dist),
+            "eta_minutes": eta_minutes,
+            "steps": [],
+        }

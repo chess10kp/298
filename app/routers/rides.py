@@ -17,9 +17,11 @@ from app.schemas.operational import (
 )
 from app.services.bidding_service import BiddingService
 from app.services.db_session import DBSession
+from fastapi import WebSocket, WebSocketDisconnect
+from app.ws import register_driver, unregister_driver, broadcast_open_rides
 from app.services.ride_service import RideService
 
-router = APIRouter(prefix="/api/rides", tags=["rides"])
+router = APIRouter(prefix="/api/v1/rides", tags=["rides"])
 
 
 def get_ride_service(db: Annotated[DBSession, Depends(get_db_session)]) -> RideService:
@@ -106,6 +108,26 @@ def place_bid(
     return bids.place_bid(conn, ride_id, driver.id, body)
 
 
+@router.get("/bids/{bid_id}/route")
+def get_bid_route(
+    bid_id: int, conn: Conn, db: Annotated[DBSession, Depends(get_db_session)]
+) -> dict:
+    bs = BiddingService(db)
+    return bs.route_driver(conn, bid_id)
+
+
+@router.websocket("/ws/drivers")
+async def drivers_ws(ws: WebSocket, db: Annotated[DBSession, Depends(get_db_session)]):
+    await ws.accept()
+    await register_driver(ws)
+    try:
+        while True:
+            # keep connection alive; we don't expect inbound messages for now
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        unregister_driver(ws)
+
+
 @router.get("/{ride_id}/bidder-locations", response_model=list[BidderLocationOut])
 def bidder_locations_for_ride(
     ride_id: int,
@@ -172,6 +194,29 @@ def accept_bid(
     _, ride_row = bids.accept_bid(
         conn, ride_id=ride_id, bid_id=bid_id, rider_id=rider.id
     )
+    # broadcast a short update to connected drivers that ride was assigned
+    # schedule background broadcast without awaiting to keep request fast
+    try:
+        import asyncio
+
+        asyncio_message = {"event": "ride_assigned", "ride_id": int(ride_row["id"])}
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop in this thread; run the coroutine in a background thread
+            import threading
+
+            def _run():
+                import asyncio as _asyncio
+
+                _asyncio.run(broadcast_open_rides(asyncio_message))
+
+            threading.Thread(target=_run, daemon=True).start()
+        else:
+            loop.create_task(broadcast_open_rides(asyncio_message))
+    except Exception:
+        # Intentionally swallow broadcast errors to avoid impacting API flow
+        pass
     return RideService.ride_from_row(ride_row)
 
 

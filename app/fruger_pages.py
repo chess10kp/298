@@ -299,12 +299,12 @@ def build_api_analytics(
         ),
         c.Heading(text="Charts", level=2, class_name=H2),
         c.Image(
-            src="/api/analytics/plots/borough.png", alt="By borough", class_name=IMG
+            src="/api/v1/analytics/plots/borough.png", alt="By borough", class_name=IMG
         ),
-        c.Image(src="/api/analytics/plots/base.png", alt="By base", class_name=IMG),
-        c.Image(src="/api/analytics/plots/hour.png", alt="By hour", class_name=IMG),
+        c.Image(src="/api/v1/analytics/plots/base.png", alt="By base", class_name=IMG),
+        c.Image(src="/api/v1/analytics/plots/hour.png", alt="By hour", class_name=IMG),
         c.Image(
-            src="/api/analytics/plots/pickups-by-date.png",
+            src="/api/v1/analytics/plots/pickups-by-date.png",
             alt="By date",
             class_name=IMG,
         ),
@@ -321,7 +321,9 @@ def build_api_analytics(
             c.Div(
                 class_name="flex flex-wrap gap-3 items-center mt-6",
                 components=[
-                    _outline_link("NYC overview (JSON API)", "/api/analytics/overview"),
+                    _outline_link(
+                        "NYC overview (JSON API)", "/api/v1/analytics/overview"
+                    ),
                     _outline_link("This view as FastUI JSON", "/api/nyc"),
                 ],
             ),

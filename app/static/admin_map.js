@@ -33,7 +33,7 @@
   async function refreshLocations() {
     const el = document.getElementById('fleet-out');
     try {
-      const locs = await api('/api/admin/driver-locations');
+      const locs = await api('/api/v1/admin/driver-locations');
       el.textContent = JSON.stringify(locs, null, 2);
 
       if (!map || !window.google || !google.maps) return;

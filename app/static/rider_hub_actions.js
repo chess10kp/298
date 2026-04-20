@@ -158,7 +158,7 @@
         return;
       }
       try {
-        const ride = await api('/api/rides', { method: 'POST', body: JSON.stringify(body) });
+        const ride = await api('/api/v1/rides', { method: 'POST', body: JSON.stringify(body) });
         setMsg(msg, `Ride #${ride.id} created.`, true);
         reloadParent();
       } catch (err) {
@@ -180,7 +180,7 @@
       }
       setMsg(msg, 'Cancelling…', null);
       try {
-        const ride = await api(`/api/rides/${encodeURIComponent(id)}/cancel`, {
+        const ride = await api(`/api/v1/rides/${encodeURIComponent(id)}/cancel`, {
           method: 'POST',
           body: '{}',
         });
@@ -199,8 +199,8 @@
       if (!msg) return;
       setMsg(msg, 'Signing out…', null);
       try {
-        console.log('FETCHING /api/auth/logout with POST');
-        const r = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        console.log('FETCHING /api/v1/auth/logout with POST');
+        const r = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
         console.log('RESPONSE STATUS:', r.status, r.statusText);
         console.log('RESPONSE OK:', r.ok);
         if (!r.ok) throw new Error(r.statusText);

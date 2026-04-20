@@ -17,7 +17,7 @@ def build_navbar(user: UserPublic | None) -> c.Div:
                 components=[c.Text(text="Logout")],
                 # Use the FastUI logout path. FastUI client prefixes API calls
                 # with /api, so the correct target here is /auth/logout which
-                # resolves to /api/auth/logout on the client-side.
+                # resolves to /api/v1/auth/logout on the client-side.
                 on_click=GoToEvent(url="/auth/logout"),
                 class_name="text-sm font-semibold text-fruger-accent hover:underline ml-4",
             )

@@ -22,7 +22,7 @@ from app.schemas.operational import (
 from app.services.auth_service import AuthService
 from app.services.db_session import DBSession
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
 

@@ -49,7 +49,7 @@
     const fareUsd = fareInput.value.trim();
     if (!fareUsd) return alert('Enter a fare amount first.');
     try {
-      await api(`/api/rides/${rideId}/bids`, {
+      await api(`/api/v1/rides/${rideId}/bids`, {
         method: 'POST',
         body: JSON.stringify({ fare_cents: cents(fareUsd) }),
       });
@@ -120,7 +120,7 @@
     const el = document.getElementById('rides-out');
     if (!el) return;
     try {
-      const rides = await api('/api/rides/open');
+      const rides = await api('/api/v1/rides/open');
       window.__lastOpenRides = rides;
       console.log('[Driver] Fetched', rides.length, 'open rides');
       el.innerHTML = buildTable(rides);
@@ -147,7 +147,7 @@
     if (!navigator.geolocation) return;
     watchPosId = navigator.geolocation.watchPosition(
       function (pos) {
-        api('/api/driver/location', {
+        api('/api/v1/driver/location', {
           method: 'POST',
           body: JSON.stringify({
             lat: pos.coords.latitude,
@@ -169,7 +169,7 @@
       const id = document.getElementById('ride-id').value;
       if (!id) return alert('Enter a ride ID first.');
       try {
-        await api('/api/rides/' + id + '/start', { method: 'POST', body: '{}' });
+        await api('/api/v1/rides/' + id + '/start', { method: 'POST', body: '{}' });
         alert('Ride started.');
         await refreshRides();
       } catch (e) {
@@ -181,7 +181,7 @@
       const id = document.getElementById('ride-id').value;
       if (!id) return alert('Enter a ride ID first.');
       try {
-        await api('/api/rides/' + id + '/complete', { method: 'POST', body: '{}' });
+        await api('/api/v1/rides/' + id + '/complete', { method: 'POST', body: '{}' });
         alert('Ride completed.');
         await refreshRides();
       } catch (e) {

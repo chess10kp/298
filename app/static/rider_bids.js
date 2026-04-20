@@ -80,7 +80,7 @@
       has = true;
 
       try {
-        const bidders = await api(`/api/rides/${ride.id}/bidder-locations`);
+        const bidders = await api(`/api/v1/rides/${ride.id}/bidder-locations`);
         bidders.forEach((b) => {
           const pos = { lat: b.lat, lng: b.lng };
           const m = new google.maps.Marker({
@@ -112,7 +112,7 @@
     const root = document.getElementById('bids-root');
     root.innerHTML = '<p>Loading…</p>';
     try {
-      const rides = await api('/api/rides/me');
+      const rides = await api('/api/v1/rides/me');
       const open = rides.filter((r) => r.status === 'bidding_open');
       if (open.length === 0) {
         root.innerHTML = '<p>No rides in <code>bidding_open</code> status.</p>';
@@ -121,7 +121,7 @@
       }
       const parts = [];
       for (const ride of open) {
-        const bids = await api(`/api/rides/${ride.id}/bids`);
+        const bids = await api(`/api/v1/rides/${ride.id}/bids`);
         let bidHtml = '';
         if (bids.length === 0) {
           bidHtml = '<p class="muted">No bids yet.</p>';
@@ -153,7 +153,7 @@
           const bidId = btn.getAttribute('data-bid');
           if (!confirm('Accept this bid and assign the driver?')) return;
           try {
-            await api(`/api/rides/${rideId}/bids/${bidId}/accept`, { method: 'POST', body: '{}' });
+            await api(`/api/v1/rides/${rideId}/bids/${bidId}/accept`, { method: 'POST', body: '{}' });
             await refresh();
           } catch (e) {
             alert(e.message);

@@ -543,20 +543,13 @@ a.card-editorial:hover {
   background: var(--surface);
   display: flex;
   flex-direction: column;
+  align-items: center;
   padding: var(--space-4) clamp(var(--space-2), 8vw, var(--space-6));
 }
 
 .login-canvas__panel {
   width: 100%;
-  max-width: 26rem;
   margin-top: clamp(2rem, 12vh, 5rem);
-  margin-left: 0;
-}
-
-@media (min-width: 720px) {
-  .login-canvas__panel {
-    margin-left: clamp(0, 6vw, 4rem);
-  }
 }
 
 .login-shortcuts-wrap {
@@ -715,6 +708,14 @@ a.card-editorial:hover {
   font-family: var(--font-body);
   padding: var(--space-3) 0
     calc(var(--fab-nav-offset) + env(safe-area-inset-bottom, 0));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tool-page > * {
+  width: 100%;
+  max-width: 90rem;
 }
 
 .tool-page h1 {

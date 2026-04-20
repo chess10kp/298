@@ -16,7 +16,7 @@ from app.schemas.operational import AdminStatsOut, DriverLocationOut
 from app.services.admin_service import AdminService
 from app.services.db_session import DBSession
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
 def get_admin_service(

@@ -33,7 +33,9 @@ def embed_driver(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ) -> HTMLResponse:
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required"
+        )
     if user.role != UserRole.driver:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -49,7 +51,9 @@ def embed_admin_map(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ) -> HTMLResponse:
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required"
+        )
     if user.role != UserRole.admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -65,7 +69,9 @@ def embed_rider_actions(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ) -> HTMLResponse:
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required"
+        )
     if user.role != UserRole.rider:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -81,7 +87,9 @@ def embed_rider_bids(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ) -> HTMLResponse:
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in required"
+        )
     if user.role != UserRole.rider:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

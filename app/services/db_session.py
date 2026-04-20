@@ -31,7 +31,9 @@ class DBSession:
             conn.close()
 
     # --- users ---
-    def get_user_by_id(self, conn: sqlite3.Connection, user_id: int) -> dict[str, Any] | None:
+    def get_user_by_id(
+        self, conn: sqlite3.Connection, user_id: int
+    ) -> dict[str, Any] | None:
         cur = conn.cursor()
         cur.execute(
             "SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?",
@@ -40,7 +42,9 @@ class DBSession:
         row = cur.fetchone()
         return dict(row) if row else None
 
-    def get_user_by_email(self, conn: sqlite3.Connection, email: str) -> dict[str, Any] | None:
+    def get_user_by_email(
+        self, conn: sqlite3.Connection, email: str
+    ) -> dict[str, Any] | None:
         cur = conn.cursor()
         cur.execute(
             "SELECT id, email, password_hash, role, created_at FROM users WHERE email = ? COLLATE NOCASE",
@@ -106,7 +110,9 @@ class DBSession:
         row = cur.fetchone()
         return dict(row) if row else None
 
-    def list_rides_for_rider(self, conn: sqlite3.Connection, rider_id: int) -> list[dict[str, Any]]:
+    def list_rides_for_rider(
+        self, conn: sqlite3.Connection, rider_id: int
+    ) -> list[dict[str, Any]]:
         cur = conn.cursor()
         cur.execute(
             """
@@ -202,7 +208,9 @@ class DBSession:
         row = cur.fetchone()
         return int(row[0]) if row else int(cur.lastrowid)
 
-    def list_bids_for_ride(self, conn: sqlite3.Connection, ride_id: int) -> list[dict[str, Any]]:
+    def list_bids_for_ride(
+        self, conn: sqlite3.Connection, ride_id: int
+    ) -> list[dict[str, Any]]:
         cur = conn.cursor()
         cur.execute(
             """
@@ -242,12 +250,19 @@ class DBSession:
         row = cur.fetchone()
         return dict(row) if row else None
 
-    def reject_other_bids(self, conn: sqlite3.Connection, ride_id: int, accepted_bid_id: int) -> None:
+    def reject_other_bids(
+        self, conn: sqlite3.Connection, ride_id: int, accepted_bid_id: int
+    ) -> None:
         conn.execute(
             """
             UPDATE bids SET status = ? WHERE ride_id = ? AND id != ? AND status = ?
             """,
-            (BidStatus.rejected.value, ride_id, accepted_bid_id, BidStatus.pending.value),
+            (
+                BidStatus.rejected.value,
+                ride_id,
+                accepted_bid_id,
+                BidStatus.pending.value,
+            ),
         )
 
     def accept_bid_row(self, conn: sqlite3.Connection, bid_id: int) -> None:
@@ -255,6 +270,25 @@ class DBSession:
             "UPDATE bids SET status = ? WHERE id = ?",
             (BidStatus.accepted.value, bid_id),
         )
+
+    def expire_stale_bids(
+        self, conn: sqlite3.Connection, older_than_minutes: int = 10
+    ) -> int:
+        """Mark bids older than `older_than_minutes` as rejected/expired and return count."""
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM bids WHERE status = ? AND datetime(created_at) <= datetime('now', ?)",
+            (BidStatus.pending.value, f"-{older_than_minutes} minutes"),
+        )
+        rows = cur.fetchall()
+        ids = [int(r[0]) for r in rows]
+        if not ids:
+            return 0
+        cur.execute(
+            "UPDATE bids SET status = ? WHERE id IN (%s)" % ",".join(["?"] * len(ids)),
+            [BidStatus.rejected.value] + ids,
+        )
+        return len(ids)
 
     # --- driver_locations ---
     def upsert_driver_location(
@@ -272,7 +306,9 @@ class DBSession:
             (driver_id, lat, lng),
         )
 
-    def get_driver_location(self, conn: sqlite3.Connection, driver_id: int) -> dict[str, Any] | None:
+    def get_driver_location(
+        self, conn: sqlite3.Connection, driver_id: int
+    ) -> dict[str, Any] | None:
         cur = conn.cursor()
         cur.execute(
             "SELECT driver_id, lat, lng, updated_at FROM driver_locations WHERE driver_id = ?",

@@ -45,7 +45,7 @@ def build_admin_dashboard(
         ),
         c.Heading(text="Revenue by day (UTC)", level=2, class_name=H2),
         c.Image(
-            src="/api/admin/plots/revenue.png",
+            src="/api/v1/admin/plots/revenue.png",
             alt="Revenue",
             class_name=IMG,
         ),
