@@ -29,28 +29,26 @@ def driver_embed(maps_key: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Driver — Fruger</title>
-  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/theme.css?v=3">
 </head>
 <body class="tool-page">
   <p class="label-md" style="margin: 0 0 var(--space-2);">Partner</p>
-  <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver map</h1>
-  <p class="muted">Session-backed location updates. Open rides appear as numbered pickup markers.</p>
-  <p class="muted" style="margin-top: var(--space-3);">Select a ride ID from a marker, then <strong>Route to pickup</strong> or place a bid.</p>
+  <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver hub</h1>
+  <p class="muted">Session-backed location updates. Browse available rides and place bids.</p>
 
-  <div id="map" class="tool-map"></div>
-
-  <div class="tool-controls">
+  <div class="tool-controls" style="margin-bottom: var(--space-3);">
     <label>Ride ID <input id="ride-id" type="number" min="1" style="width:6rem"></label>
-    <label>Fare (USD) <input id="fare-usd" type="number" step="0.01" min="0.01" value="12.00" style="width:5rem"></label>
-    <button id="btn-bid" type="button" class="btn btn--primary">Place bid</button>
-    <button id="btn-route" type="button" class="btn btn--ghost">Route to pickup</button>
     <button id="btn-start" type="button" class="btn btn--ghost">Start ride</button>
     <button id="btn-done" type="button" class="btn btn--secondary">Complete ride</button>
   </div>
 
-  <h2>Open rides (raw)</h2>
-  <pre id="rides-out" class="tool-pre">Loading…</pre>
-  <script src="/static/driver.js"></script>
+  <h2>Available rides</h2>
+  <div class="rides-panel">
+    <div class="rides-panel__scroll">
+      <div id="rides-out">Loading…</div>
+    </div>
+  </div>
+  <script src="/static/driver.js?v=2"></script>
   <script async defer src="{src}"></script>
 </body>
 </html>
@@ -64,26 +62,26 @@ def driver_embed_no_key() -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Driver — Fruger</title>
-  <link rel="stylesheet" href="/static/theme.css">
+  <link rel="stylesheet" href="/static/theme.css?v=3">
 </head>
 <body class="tool-page">
   <p class="label-md" style="margin: 0 0 var(--space-2);">Partner</p>
-  <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver map</h1>
-  <p class="warn">Set <code>GOOGLE_MAPS_API_KEY</code> to enable the map. Bids and ride APIs still work.</p>
-  <p class="muted">Session-backed location updates. Open rides appear as numbered pickup markers.</p>
-  <p class="muted" style="margin-top: var(--space-3);">Select a ride ID from a marker, then <strong>Route to pickup</strong> or place a bid.</p>
-  <div id="map" class="tool-map"></div>
-  <div class="tool-controls">
+  <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver hub</h1>
+  <p class="muted">Session-backed location updates. Browse available rides and place bids.</p>
+
+  <div class="tool-controls" style="margin-bottom: var(--space-3);">
     <label>Ride ID <input id="ride-id" type="number" min="1" style="width:6rem"></label>
-    <label>Fare (USD) <input id="fare-usd" type="number" step="0.01" min="0.01" value="12.00" style="width:5rem"></label>
-    <button id="btn-bid" type="button" class="btn btn--primary">Place bid</button>
-    <button id="btn-route" type="button" class="btn btn--ghost">Route to pickup</button>
     <button id="btn-start" type="button" class="btn btn--ghost">Start ride</button>
     <button id="btn-done" type="button" class="btn btn--secondary">Complete ride</button>
   </div>
-  <h2>Open rides (raw)</h2>
-  <pre id="rides-out" class="tool-pre">Loading…</pre>
-  <script src="/static/driver.js"></script>
+
+  <h2>Available rides</h2>
+  <div class="rides-panel">
+    <div class="rides-panel__scroll">
+      <div id="rides-out">Loading…</div>
+    </div>
+  </div>
+  <script src="/static/driver.js?v=2"></script>
   <script>window.initDriverMap = function () { console.warn('No maps key'); };</script>
 </body>
 </html>

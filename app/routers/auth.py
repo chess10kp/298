@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from fastui import components as c
+from fastui.events import GoToEvent
 
 from app.deps import Conn, get_auth_service, get_db_session
 from app.schemas.operational import (
@@ -20,6 +23,7 @@ from app.services.auth_service import AuthService
 from app.services.db_session import DBSession
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/register", response_model=UserPublic)
@@ -82,37 +86,57 @@ def create_session(
     """JSON login that sets ``access_token`` httpOnly cookie for browser flows."""
     import app.config as app_config
 
+    logger.info(f"SESSION LOGIN: email={body.email}")
     row = db.get_user_by_email(conn, body.email)
     if row is None or not auth.verify_password(
         body.password, str(row["password_hash"])
     ):
+        logger.error(f"SESSION LOGIN FAILED: email={body.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
         )
     token = auth.create_access_token(user_id=int(row["id"]), role=str(row["role"]))
     max_age = app_config.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    logger.info(f"SETTING COOKIE: key=access_token, max_age={max_age}, httponly=True")
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         max_age=max_age,
         samesite="lax",
+        path="/",
     )
+    logger.info(f"SESSION LOGIN SUCCESS: user_id={row['id']}, email={body.email}")
     return {"ok": True}
 
 
 @router.post("/logout")
-def logout(response: Response) -> dict[str, bool]:
-    response.delete_cookie("access_token")
+def logout(request: Request, response: Response) -> dict[str, bool]:
+    logger.info(f"LOGOUT POST CALLED")
+    logger.info(f"COOKIES BEFORE DELETE: {dict(request.cookies)}")
+    response.delete_cookie("access_token", httponly=True, samesite="lax", path="/")
+    logger.info(
+        f"COOKIE DELETED: access_token with httponly=True, samesite=lax, path=/"
+    )
     return {"ok": True}
 
 
 @router.get("/logout")
-def logout_get() -> RedirectResponse:
-    """GET logout for browser navigation — clears cookie and redirects to /login."""
-    from fastapi.responses import RedirectResponse
-
-    response = RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+def logout_get(request: Request, response: Response) -> JSONResponse:
+    """GET logout — clears cookie and tells FastUI client to navigate to /."""
+    logger.info(f"LOGOUT GET CALLED")
+    logger.info(f"COOKIES BEFORE DELETE: {dict(request.cookies)}")
+    logger.info(f"REQUEST HEADERS: {dict(request.headers)}")
+    response.delete_cookie("access_token", httponly=True, samesite="lax", path="/")
+    response.delete_cookie("access_token", httponly=True, samesite="lax")
+    response.delete_cookie("access_token", path="/")
     response.delete_cookie("access_token")
-    return response
+    logger.info("DELETED access_token WITH ALL POSSIBLE PARAMETER COMBINATIONS")
+    fire_event = c.FireEvent(event=GoToEvent(url="/login"))
+    resp = JSONResponse([fire_event.model_dump(exclude_none=True, by_alias=True)])
+    for key, value in response.headers.items():
+        if key.lower() == "set-cookie":
+            resp.headers[key] = value
+    logger.info(f"RESPONSE HEADERS: {dict(resp.headers)}")
+    return resp

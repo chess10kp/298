@@ -9,22 +9,33 @@ from app.fruger_tailwind import FOOTER, NAVBAR
 from app.schemas.operational import UserPublic
 
 
-def build_navbar(user: UserPublic | None) -> c.Navbar:
-    end_links: list[AnyComponent] = []
+def build_navbar(user: UserPublic | None) -> c.Div:
+    right: list[AnyComponent] = []
     if user is not None:
-        end_links.append(
+        right.append(
             c.Link(
                 components=[c.Text(text="Logout")],
-                on_click=GoToEvent(url="/api/auth/logout"),
-                class_name="text-sm font-semibold text-white/80 hover:text-white",
+                # Use the FastUI logout path. FastUI client prefixes API calls
+                # with /api, so the correct target here is /auth/logout which
+                # resolves to /api/auth/logout on the client-side.
+                on_click=GoToEvent(url="/auth/logout"),
+                class_name="text-sm font-semibold text-fruger-accent hover:underline ml-4",
             )
         )
 
-    return c.Navbar(
+    return c.Div(
         class_name=NAVBAR,
-        title="Fruger",
-        title_event=GoToEvent(url="/"),
-        end_links=end_links,
+        components=[
+            c.Link(
+                components=[c.Text(text="Fruger")],
+                on_click=GoToEvent(url="/"),
+                class_name="font-display text-base font-bold text-fruger-on no-underline hover:opacity-80",
+            ),
+            c.Div(
+                class_name="flex items-center",
+                components=right,
+            ),
+        ],
     )
 
 

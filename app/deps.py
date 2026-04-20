@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from collections.abc import Generator
 from typing import Annotated
@@ -14,6 +15,7 @@ from app.schemas.operational import UserPublic, UserRole
 from app.services.auth_service import AuthService
 from app.services.db_session import DBSession
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 
@@ -50,8 +52,12 @@ def get_token_optional(
     ],
 ) -> str | None:
     if credentials is not None and credentials.credentials:
+        logger.info(f"Token from Bearer header: {credentials.credentials[:20]}...")
         return credentials.credentials
-    return request.cookies.get("access_token")
+    cookie_token = request.cookies.get("access_token")
+    logger.info(f"Token from cookie: {cookie_token[:20] if cookie_token else None}...")
+    logger.info(f"All cookies: {dict(request.cookies)}")
+    return cookie_token
 
 
 def get_current_user_optional(
@@ -61,6 +67,7 @@ def get_current_user_optional(
     token: Annotated[str | None, Depends(get_token_optional)],
 ) -> UserPublic | None:
     if not token:
+        logger.info("No token found, returning None user")
         return None
     try:
         payload = jwt.decode(
@@ -68,18 +75,24 @@ def get_current_user_optional(
         )
         sub = payload.get("sub")
         if sub is None:
+            logger.info("No 'sub' in token payload, returning None user")
             return None
         uid = int(sub)
-    except (JWTError, ValueError, TypeError):
+        logger.info(f"Decoded token for user_id: {uid}")
+    except (JWTError, ValueError, TypeError) as e:
+        logger.info(f"Token decode error: {e}, returning None user")
         return None
     row = db.get_user_by_id(conn, uid)
     if row is None:
+        logger.info(f"User not found in DB for id: {uid}, returning None user")
         return None
-    return UserPublic(
+    user = UserPublic(
         id=int(row["id"]),
         email=str(row["email"]),
         role=UserRole(str(row["role"])),
     )
+    logger.info(f"Found user: {user.email} (role: {user.role})")
+    return user
 
 
 def get_current_user(
@@ -97,7 +110,9 @@ def get_current_user(
 def require_roles(*roles: UserRole):
     def _inner(user: Annotated[UserPublic, Depends(get_current_user)]) -> UserPublic:
         if user.role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+            )
         return user
 
     return _inner

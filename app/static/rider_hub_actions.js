@@ -195,13 +195,21 @@
   const logoutBtn = document.getElementById('rider-hub-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
+      console.log('LOGOUT BUTTON CLICKED');
       if (!msg) return;
       setMsg(msg, 'Signing out…', null);
       try {
+        console.log('FETCHING /api/auth/logout with POST');
         const r = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        console.log('RESPONSE STATUS:', r.status, r.statusText);
+        console.log('RESPONSE OK:', r.ok);
         if (!r.ok) throw new Error(r.statusText);
+        const text = await r.text();
+        console.log('RESPONSE BODY:', text);
+        console.log('REDIRECTING TO /login');
         window.top.location.href = '/login';
       } catch (err) {
+        console.error('LOGOUT ERROR:', err);
         setMsg(msg, String(err.message || err), false);
       }
     });

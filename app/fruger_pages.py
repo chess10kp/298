@@ -168,18 +168,6 @@ def build_api_home(user: UserPublic) -> list[AnyComponent]:
                         ),
                     ],
                 ),
-                c.Div(class_name="grid gap-4 sm:grid-cols-2", components=cards),
-                c.Div(
-                    class_name="flex flex-wrap gap-3 items-center mt-8",
-                    components=[
-                        _outline_link("Open this page as FastUI JSON", "/api/"),
-                        _outline_link("Open NYC analytics as FastUI JSON", "/api/nyc"),
-                    ],
-                ),
-                c.Paragraph(
-                    text="Same UI trees returned as JSON for tools and API clients.",
-                    class_name="text-xs text-fruger-muted mt-2",
-                ),
                 build_footer(),
             ],
         )

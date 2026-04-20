@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
-from fastui import AnyComponent, components as c
+from fastui import AnyComponent
+from fastui import components as c
 from fastui.components.display import DisplayLookup
 from fastui.events import GoToEvent
 
@@ -60,7 +61,7 @@ def build_rider_dashboard(
             c.Page(
                 class_name=PAGE,
                 components=[
-                    c.PageTitle(text="Rider hub — Fruger"),
+                    c.PageTitle(text="Fruger"),
                     build_navbar(user),
                     c.Heading(text="Fruger", level=1, class_name=H1),
                     c.Paragraph(

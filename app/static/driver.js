@@ -1,10 +1,6 @@
 (function () {
-  let map = null;
-  let marker = null;
-  let directionsService = null;
-  let directionsRenderer = null;
-  let rideMarkers = [];
-  let infoWindow = null;
+  console.log('[Driver] Loading driver.js v2');
+  let watchPosId = null;
 
   async function api(path, opts) {
     const r = await fetch(path, {
@@ -33,234 +29,186 @@
     return Math.round(Number(usd) * 100);
   }
 
-  function clearRideMarkers() {
-    rideMarkers.forEach((m) => m.setMap(null));
-    rideMarkers = [];
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fmtTime(iso) {
+    try {
+      return new Date(iso).toLocaleTimeString();
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  async function placeBid(rideId, fareInput) {
+    const fareUsd = fareInput.value.trim();
+    if (!fareUsd) return alert('Enter a fare amount first.');
+    try {
+      await api(`/api/rides/${rideId}/bids`, {
+        method: 'POST',
+        body: JSON.stringify({ fare_cents: cents(fareUsd) }),
+      });
+      alert('Bid placed!');
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  function buildTable(rides) {
+    if (!rides || rides.length === 0) {
+      return '<p class="rides-table__empty">No rides available right now.</p>';
+    }
+    const rows = rides.map(function (ride) {
+      return (
+        '<tr data-ride-id="' + esc(ride.id) + '" style="cursor:pointer;">' +
+        '<td class="rides-table__id"><span class="rides-table__id-inner">' +
+        esc(ride.id) +
+        '</span></td>' +
+        '<td class="rides-table__mono">' +
+        esc(ride.pickup_lat.toFixed(5)) +
+        ', ' +
+        esc(ride.pickup_lng.toFixed(5)) +
+        '</td>' +
+        '<td class="rides-table__mono">' +
+        esc(ride.dropoff_lat.toFixed(5)) +
+        ', ' +
+        esc(ride.dropoff_lng.toFixed(5)) +
+        '</td>' +
+        '<td class="rides-table__time rides-table__mono">' +
+        esc(fmtTime(ride.created_at)) +
+        '</td>' +
+        '<td>' +
+        '<div style="display:flex;gap:0.5rem;align-items:center;">' +
+        '<input type="number" step="0.01" min="0.01" value="12.00" ' +
+        'style="width:5rem;font-size:0.875rem;padding:0.25rem 0.5rem;border:1px solid var(--outline-variant,#e5e5e5);border-radius:0.25rem;" ' +
+        'data-ride-id="' +
+        esc(ride.id) +
+        '">' +
+        '<button type="button" class="btn btn--primary btn--sm" ' +
+        'onclick="event.stopPropagation();window.__driverPlaceBid(' +
+        esc(ride.id) +
+        ', this.previousElementSibling)">' +
+        'Bid' +
+        '</button>' +
+        '</div>' +
+        '</td>' +
+        '</tr>'
+      );
+    });
+    return (
+      '<table class="rides-table">' +
+      '<thead><tr>' +
+      '<th>ID</th>' +
+      '<th>Pickup</th>' +
+      '<th>Dropoff</th>' +
+      '<th>Created</th>' +
+      '<th>Your bid</th>' +
+      '</tr></thead>' +
+      '<tbody>' +
+      rows.join('') +
+      '</tbody>' +
+      '</table>'
+    );
   }
 
   async function refreshRides() {
     const el = document.getElementById('rides-out');
+    if (!el) return;
     try {
       const rides = await api('/api/rides/open');
       window.__lastOpenRides = rides;
-      el.textContent = JSON.stringify(rides, null, 2);
-
-      if (!map || !window.google || !google.maps) return;
-
-      clearRideMarkers();
-      if (infoWindow) {
-        infoWindow.close();
-        infoWindow = null;
-      }
-
-      const bounds = new google.maps.LatLngBounds();
-      rides.forEach((ride) => {
-        const pos = { lat: ride.pickup_lat, lng: ride.pickup_lng };
-        const m = new google.maps.Marker({
-          position: pos,
-          map,
-          title: `Pickup · ride #${ride.id}`,
-          label: String(ride.id),
-        });
-        m.addListener('click', () => {
-          document.getElementById('ride-id').value = String(ride.id);
-          if (!infoWindow) infoWindow = new google.maps.InfoWindow();
-          const esc = (s) =>
-            String(s)
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/"/g, '&quot;');
-          infoWindow.setContent(
-            `<div style="font-family:system-ui,sans-serif;max-width:220px;line-height:1.4">` +
-              `<strong>Ride #${esc(ride.id)}</strong><br>` +
-              `Status: ${esc(ride.status)}<br>` +
-              `<button type="button" id="iw-use">Use for bid / start / complete</button>` +
-              `</div>`,
-          );
-          infoWindow.open(map, m);
-          google.maps.event.addListenerOnce(infoWindow, 'domready', () => {
-            const b = document.getElementById('iw-use');
-            if (b)
-              b.onclick = () => {
-                document.getElementById('ride-id').value = String(ride.id);
-                infoWindow.close();
-              };
+      console.log('[Driver] Fetched', rides.length, 'open rides');
+      el.innerHTML = buildTable(rides);
+      el.querySelectorAll('tbody tr[data-ride-id]').forEach(function (row) {
+        row.onclick = function () {
+          document.querySelectorAll('tbody tr').forEach(function (r) {
+            r.style.backgroundColor = '';
           });
-        });
-        rideMarkers.push(m);
-        bounds.extend(pos);
+          row.style.backgroundColor = '#e3f2fd';
+          document.getElementById('ride-id').value = row.dataset.rideId;
+        };
       });
-
-      const you = marker && marker.getPosition();
-      if (you) bounds.extend(you);
-      if (rides.length > 0) {
-        map.fitBounds(bounds);
-      }
     } catch (e) {
-      el.textContent =
-        'Could not load open rides (are you logged in as a driver?): ' + e.message;
+      el.innerHTML =
+        '<p class="err">Could not load rides: ' + esc(e.message) + '</p>';
     }
   }
 
-  window.routeToPickup = function () {
-    const id = parseInt(document.getElementById('ride-id').value, 10);
-    const rides = window.__lastOpenRides || [];
-    const ride = rides.find((r) => r.id === id);
-    if (!ride || !directionsService || !directionsRenderer || !marker) {
-      if (!ride) alert('Select a ride (marker or ID) first.');
-      return;
-    }
-    const origin = marker.getPosition();
-    if (!origin) {
-      alert('Waiting for your GPS position…');
-      return;
-    }
-    directionsService.route(
-      {
-        origin,
-        destination: { lat: ride.pickup_lat, lng: ride.pickup_lng },
-        travelMode: google.maps.TravelMode.DRIVING,
+  window.__driverPlaceBid = function (rideId, fareInput) {
+    placeBid(rideId, fareInput).then(refreshRides);
+  };
+
+  function startGpsTracking() {
+    if (!navigator.geolocation) return;
+    watchPosId = navigator.geolocation.watchPosition(
+      function (pos) {
+        api('/api/driver/location', {
+          method: 'POST',
+          body: JSON.stringify({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          }),
+        }).catch(function () {});
       },
-      (res, status) => {
-        if (status === 'OK') directionsRenderer.setDirections(res);
-        else alert('Directions failed: ' + status);
-      },
+      function () {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
     );
-  };
-
-  window.initDriverMap = function () {
-    const el = document.getElementById('map');
-    if (!window.google || !google.maps) {
-      el.textContent = 'Maps failed to load.';
-      return;
-    }
-    map = new google.maps.Map(el, {
-      center: { lat: 40.7128, lng: -74.006 },
-      zoom: 12,
-    });
-    directionsService = new google.maps.DirectionsService();
-    directionsRenderer = new google.maps.DirectionsRenderer({ map });
-    marker = new google.maps.Marker({ map, title: 'You' });
-
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const loc = { lat, lng };
-          marker.setPosition(loc);
-          map.panTo(loc);
-          api('/api/driver/location', {
-            method: 'POST',
-            body: JSON.stringify({ lat, lng }),
-          }).catch(() => {});
-        },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
-      );
-    }
-
-    document.getElementById('btn-bid').onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      const fareUsd = document.getElementById('fare-usd').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/bids`, {
-          method: 'POST',
-          body: JSON.stringify({ fare_cents: cents(fareUsd) }),
-        });
-        await refreshRides();
-        alert('Bid placed');
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-
-    document.getElementById('btn-start').onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/start`, { method: 'POST', body: '{}' });
-        alert('Started');
-        await refreshRides();
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-
-    document.getElementById('btn-done').onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/complete`, { method: 'POST', body: '{}' });
-        alert('Completed');
-        await refreshRides();
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-
-    const btnRoute = document.getElementById('btn-route');
-    if (btnRoute) btnRoute.onclick = () => window.routeToPickup();
-
-    setInterval(refreshRides, 8000);
-    refreshRides();
-  };
-
-  function attachControlsWithoutMap() {
-    const bid = document.getElementById('btn-bid');
-    if (!bid || bid.dataset.wired === '1') return;
-    bid.dataset.wired = '1';
-    bid.onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      const fareUsd = document.getElementById('fare-usd').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/bids`, {
-          method: 'POST',
-          body: JSON.stringify({ fare_cents: cents(fareUsd) }),
-        });
-        await refreshRides();
-        alert('Bid placed');
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-    document.getElementById('btn-start').onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/start`, { method: 'POST', body: '{}' });
-        alert('Started');
-        await refreshRides();
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-    document.getElementById('btn-done').onclick = async () => {
-      const id = document.getElementById('ride-id').value;
-      if (!id) return alert('Ride ID');
-      try {
-        await api(`/api/rides/${id}/complete`, { method: 'POST', body: '{}' });
-        alert('Completed');
-        await refreshRides();
-      } catch (e) {
-        alert(e.message);
-      }
-    };
-    const btnRoute = document.getElementById('btn-route');
-    if (btnRoute)
-      btnRoute.onclick = () =>
-        alert('Route to pickup requires GOOGLE_MAPS_API_KEY and the map to load.');
   }
 
-  if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
+  function attachControls() {
+    const startBtn = document.getElementById('btn-start');
+    if (!startBtn || startBtn.dataset.wired === '1') return;
+    startBtn.dataset.wired = '1';
+
+    startBtn.onclick = async function () {
+      const id = document.getElementById('ride-id').value;
+      if (!id) return alert('Enter a ride ID first.');
+      try {
+        await api('/api/rides/' + id + '/start', { method: 'POST', body: '{}' });
+        alert('Ride started.');
+        await refreshRides();
+      } catch (e) {
+        alert(e.message);
+      }
+    };
+
+    document.getElementById('btn-done').onclick = async function () {
+      const id = document.getElementById('ride-id').value;
+      if (!id) return alert('Enter a ride ID first.');
+      try {
+        await api('/api/rides/' + id + '/complete', { method: 'POST', body: '{}' });
+        alert('Ride completed.');
+        await refreshRides();
+      } catch (e) {
+        alert(e.message);
+      }
+    };
+  }
+
+  function init() {
+    startGpsTracking();
     setInterval(refreshRides, 8000);
     refreshRides();
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', attachControlsWithoutMap);
+      document.addEventListener('DOMContentLoaded', attachControls);
     } else {
-      attachControlsWithoutMap();
+      attachControls();
     }
+  }
+
+  window.initDriverMap = function () {
+    startGpsTracking();
+    init();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 })();

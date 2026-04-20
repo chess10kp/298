@@ -35,6 +35,24 @@
   box-sizing: border-box;
 }
 
+/* FastUI prebuilt navbar overrides — restore design-system text colors */
+#root nav a,
+#root nav .navbar-brand,
+#root nav .nav-link {
+  color: var(--on-surface) !important;
+}
+
+#root nav a:hover {
+  color: var(--secondary) !important;
+}
+
+/* Hide hamburger / toggler — only show title + end_links */
+#root nav .navbar-toggler,
+#root nav button[class*="toggler"],
+#root nav [data-testid="navbar-toggler"] {
+  display: none !important;
+}
+
 /* Hide scrollbars everywhere; scrolling still works (wheel, touch, keys) */
 * {
   scrollbar-width: none;
@@ -690,11 +708,12 @@ a.card-editorial:hover {
 /* Tool pages (maps) */
 .tool-page {
   margin: 0;
+  width: 100%;
   min-height: 100vh;
   background: var(--surface);
   color: var(--on-surface);
   font-family: var(--font-body);
-  padding: var(--space-3) clamp(var(--space-2), 3vw, var(--space-4))
+  padding: var(--space-3) 0
     calc(var(--fab-nav-offset) + env(safe-area-inset-bottom, 0));
 }
 
@@ -851,9 +870,21 @@ a.card-editorial:hover {
 
 .rides-table {
   width: 100%;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Full-width rides panel for driver page */
+.tool-page .rides-panel {
+  width: 100%;
+}
+
+.tool-page .rides-panel__scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rides-table thead th {
