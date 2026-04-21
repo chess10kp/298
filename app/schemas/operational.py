@@ -69,6 +69,8 @@ class RideOut(BaseModel):
     created_at: str
     cancelled_at: str | None
     completed_at: str | None
+    driver_marked_complete_at: str | None = None
+    rider_marked_complete_at: str | None = None
 
 
 class BidOut(BaseModel):
@@ -93,11 +95,21 @@ class DriverLocationIn(BaseModel):
 class AdminStatsOut(BaseModel):
     total_rides: int
     rides_by_status: dict[str, int]
-    completed_revenue_cents: int
+    completed_revenue_cents: int = Field(
+        description=(
+            "Fruger marketplace only: sum of ``final_fare_cents`` on completed rows in the "
+            "``rides`` table. NYC TLC ``pickups`` rows are not rides and have no fares."
+        ),
+    )
+    revenue_ride_count: int = Field(
+        description="Completed rides included in ``completed_revenue_cents`` (have ``final_fare_cents``).",
+    )
     total_bids: int
     nyc_pickup_records: int = Field(
         0,
-        description="Rows in the TLC/NYC ``pickups`` seed table (analytics only; not Fruger trips).",
+        description=(
+            "Row count in the unified ``pickups`` table (TLC/Kaggle seed plus one row per ride request)."
+        ),
     )
 
 

@@ -35,7 +35,27 @@
       .replace(/"/g, '&quot;');
   }
 
-  
+  function coordKey(lat, lng) {
+    return Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5);
+  }
+
+  async function resolveAddressLabels(rides) {
+    const points = [];
+    for (const r of rides) {
+      if (!r.pickup_location) points.push({ lat: r.pickup_lat, lng: r.pickup_lng });
+      if (!r.dropoff_location) points.push({ lat: r.dropoff_lat, lng: r.dropoff_lng });
+    }
+    if (points.length === 0) return {};
+    try {
+      const res = await api('/api/v1/geocode/reverse-batch', {
+        method: 'POST',
+        body: JSON.stringify({ points }),
+      });
+      return res && typeof res.labels === 'object' ? res.labels : {};
+    } catch (_) {
+      return {};
+    }
+  }
 
   async function refresh(silent) {
     const root = document.getElementById('bids-root');
@@ -47,6 +67,7 @@
         root.innerHTML = '<p>No rides in <code>bidding_open</code> status.</p>';
         return;
       }
+      const labels = await resolveAddressLabels(open);
       const parts = [];
       for (const ride of open) {
         const bids = await api(`/api/v1/rides/${ride.id}/bids`);
@@ -66,15 +87,19 @@
               .join('') +
             '</ul>';
         }
+        const pk = coordKey(ride.pickup_lat, ride.pickup_lng);
+        const dk = coordKey(ride.dropoff_lat, ride.dropoff_lng);
+        const pickupResolved = ride.pickup_location || labels[pk];
+        const dropResolved = ride.dropoff_location || labels[dk];
         parts.push(
           `<section class="ride-card-ds"><h2>Ride #${esc(ride.id)}</h2>` +
             `<p class="muted">Pickup: ${
-              ride.pickup_location
-                ? esc(ride.pickup_location) + ' · ' + esc(ride.pickup_lat) + ', ' + esc(ride.pickup_lng)
+              pickupResolved
+                ? esc(pickupResolved) + ' · ' + esc(ride.pickup_lat) + ', ' + esc(ride.pickup_lng)
                 : esc(ride.pickup_lat) + ', ' + esc(ride.pickup_lng)
             } · Dropoff: ${
-              ride.dropoff_location
-                ? esc(ride.dropoff_location) + ' · ' + esc(ride.dropoff_lat) + ', ' + esc(ride.dropoff_lng)
+              dropResolved
+                ? esc(dropResolved) + ' · ' + esc(ride.dropoff_lat) + ', ' + esc(ride.dropoff_lng)
                 : esc(ride.dropoff_lat) + ', ' + esc(ride.dropoff_lng)
             }</p>` +
             bidHtml +

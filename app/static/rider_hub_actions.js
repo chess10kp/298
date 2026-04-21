@@ -119,6 +119,41 @@
     if (ok === false) el.classList.add('err');
   }
 
+  function coordKey(lat, lng) {
+    return Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5);
+  }
+
+  /** Server reverse geocode for coords missing pickup/dropoff labels (session cookie). */
+  function rideStatusCell(status) {
+    const s = String(status || '');
+    const label = s.replace(/_/g, ' ');
+    return (
+      '<span class="ride-status ride-status--' +
+      esc(s) +
+      '">' +
+      esc(label) +
+      '</span>'
+    );
+  }
+
+  async function resolveAddressLabels(rides) {
+    const points = [];
+    for (const r of rides) {
+      if (!r.pickup_location) points.push({ lat: r.pickup_lat, lng: r.pickup_lng });
+      if (!r.dropoff_location) points.push({ lat: r.dropoff_lat, lng: r.dropoff_lng });
+    }
+    if (points.length === 0) return {};
+    try {
+      const res = await api('/api/v1/geocode/reverse-batch', {
+        method: 'POST',
+        body: JSON.stringify({ points }),
+      });
+      return res && typeof res.labels === 'object' ? res.labels : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
   function reloadParent() {
     try {
       if (window.parent && window.parent !== window) window.parent.location.reload();
@@ -343,29 +378,71 @@
         root.innerHTML = '<p class="muted">No rides found.</p>';
         return;
       }
+      const labels = await resolveAddressLabels(rides);
       const rows = rides
         .map((r) => {
-          const pickup = r.pickup_location
-            ? `${esc(r.pickup_location)} · ${esc(r.pickup_lat)}, ${esc(r.pickup_lng)}`
+          const pk = coordKey(r.pickup_lat, r.pickup_lng);
+          const dk = coordKey(r.dropoff_lat, r.dropoff_lng);
+          const pickupResolved = r.pickup_location || labels[pk];
+          const dropResolved = r.dropoff_location || labels[dk];
+          const pickup = pickupResolved
+            ? `${esc(pickupResolved)} · ${esc(r.pickup_lat)}, ${esc(r.pickup_lng)}`
             : `${esc(r.pickup_lat)}, ${esc(r.pickup_lng)}`;
-          const drop = r.dropoff_location
-            ? `${esc(r.dropoff_location)} · ${esc(r.dropoff_lat)}, ${esc(r.dropoff_lng)}`
+          const drop = dropResolved
+            ? `${esc(dropResolved)} · ${esc(r.dropoff_lat)}, ${esc(r.dropoff_lng)}`
             : `${esc(r.dropoff_lat)}, ${esc(r.dropoff_lng)}`;
+          let actions = '';
+          if (r.status === 'bidding_open' || r.status === 'assigned') {
+            actions =
+              '<button type="button" class="btn btn--secondary rider-cancel" data-ride="' +
+              esc(r.id) +
+              '">Cancel</button>';
+          } else if (r.status === 'in_progress') {
+            let hint = '';
+            if (r.driver_marked_complete_at && !r.rider_marked_complete_at) {
+              hint =
+                '<span class="muted body-sm" style="display:block;margin-top:0.35rem;">Driver finished — confirm drop-off.</span>';
+            } else if (!r.driver_marked_complete_at && r.rider_marked_complete_at) {
+              hint =
+                '<span class="muted body-sm" style="display:block;margin-top:0.35rem;">Waiting for driver to confirm.</span>';
+            }
+            actions =
+              '<button type="button" class="btn btn--primary rider-trip-done" data-ride="' +
+              esc(r.id) +
+              '">Confirm trip complete</button>' +
+              hint;
+          } else {
+            actions = '<span class="muted">—</span>';
+          }
           return (
             '<tr data-ride-id="' + esc(r.id) + '">' +
-            '<td>' + esc(r.id) + '</td>' +
-            '<td>' + esc(r.status) + '</td>' +
-            '<td>' + pickup + '</td>' +
-            '<td>' + drop + '</td>' +
-            '<td><button type="button" class="btn btn--secondary rider-cancel" data-ride="' + esc(r.id) + '">Cancel</button></td>' +
+            '<td class="rides-table__id"><span class="rides-table__id-inner">#' +
+            esc(r.id) +
+            '</span></td>' +
+            '<td>' +
+            rideStatusCell(r.status) +
+            '</td>' +
+            '<td>' +
+            pickup +
+            '</td>' +
+            '<td>' +
+            drop +
+            '</td>' +
+            '<td>' +
+            actions +
+            '</td>' +
             '</tr>'
           );
         })
         .join('');
       root.innerHTML =
-        '<table style="width:100%; border-collapse: collapse;" class="tool-table"><thead><tr><th>Ride</th><th>Status</th><th>Pickup</th><th>Dropoff</th><th></th></tr></thead><tbody>' +
+        '<div class="embed-table-wrap">' +
+        '<table class="fruger-data-table" aria-label="Your rides">' +
+        '<thead><tr>' +
+        '<th>Ride</th><th>Status</th><th>Pickup</th><th>Dropoff</th><th></th>' +
+        '</tr></thead><tbody>' +
         rows +
-        '</tbody></table>';
+        '</tbody></table></div>';
       root.querySelectorAll('.rider-cancel').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const rid = btn.getAttribute('data-ride');
@@ -379,6 +456,33 @@
               body: '{}',
             });
             setMsg(msg, `Ride #${ride.id} cancelled (${ride.status}).`, true);
+            notifyBidsIframeRefresh();
+            fetchAndRenderMyRides();
+            reloadParent();
+          } catch (err) {
+            setMsg(msg, String(err.message || err), false);
+          }
+        });
+      });
+      root.querySelectorAll('.rider-trip-done').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const rid = btn.getAttribute('data-ride');
+          if (!confirm('Confirm trip #' + rid + ' is finished?')) return;
+          try {
+            setMsg(msg, 'Saving…', null);
+            const ride = await api(`/api/v1/rides/${encodeURIComponent(rid)}/rider-complete`, {
+              method: 'POST',
+              body: '{}',
+            });
+            if (ride.status === 'completed') {
+              setMsg(msg, `Ride #${ride.id} completed.`, true);
+            } else {
+              setMsg(
+                msg,
+                `Recorded — trip #${ride.id} finishes when the driver confirms too.`,
+                true,
+              );
+            }
             notifyBidsIframeRefresh();
             fetchAndRenderMyRides();
             reloadParent();
@@ -403,7 +507,7 @@
       try {
         const r = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
         if (!r.ok) throw new Error(r.statusText);
-        window.top.location.href = '/login';
+        window.top.location.href = '/';
       } catch (err) {
         setMsg(msg, String(err.message || err), false);
       }

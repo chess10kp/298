@@ -40,15 +40,22 @@ def _standalone_login_abs_url(request: Request) -> str:
     return f"{base}/login?{q}" if q else f"{base}/login"
 
 
+def _standalone_home_abs_url(request: Request) -> str:
+    """SPA shell at ``/``; full URL matches login/logout navigation style."""
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/"
+
+
 @router.api_route("/api/auth/logout", methods=["GET", "POST"])
 @router.api_route("/api/auth/logout/", methods=["GET", "POST"])
+@router.api_route("/api/logout", methods=["GET", "POST"])
+@router.api_route("/api/logout/", methods=["GET", "POST"])
 def api_auth_logout_fastui(request: Request) -> JSONResponse:
-    """FastUI maps browser path ``/auth/logout`` → ``GET /api/auth/logout`` (sometimes with ``/``).
+    """FastUI maps browser path + ``/api`` (e.g. ``/auth/logout`` → ``/api/auth/logout``).
 
-    Paths without a matching API route fall through to the SPA HTML catch-all (200 + HTML), so
-    ``response.json()`` throws "Response not valid JSON". Trailing slash must be registered too.
+    ``/logout`` alone becomes ``/api/logout``; register both so JSON is never the HTML catch-all.
     """
-    target = _standalone_login_abs_url(request)
+    target = _standalone_home_abs_url(request)
     payload = [
         c.FireEvent(event=GoToEvent(url=target)).model_dump(
             exclude_none=True, by_alias=True

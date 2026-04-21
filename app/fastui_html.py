@@ -97,6 +97,26 @@ def fruger_prebuilt_html(
   </head>
   <body class="ds-body">
     <div id="root"></div>
+    <script>
+      // Dismissible onboarding banner persistence (localStorage)
+      (function () {{
+        try {{
+          const dismissed = localStorage.getItem('fruger_onboarding_dismissed');
+          if (dismissed === '1') {{
+            document.documentElement.classList.add('fruger-onboarding-dismissed');
+          }}
+          document.addEventListener('click', function (e) {{
+            const tgt = e.target || e.srcElement;
+            if (tgt && tgt.closest && tgt.closest('.fruger-onboarding-dismiss')) {{
+              localStorage.setItem('fruger_onboarding_dismissed', '1');
+              document.documentElement.classList.add('fruger-onboarding-dismissed');
+            }}
+          }}, {{capture: true}});
+        }} catch (err) {{
+          // ignore
+        }}
+      }})();
+    </script>
   </body>
 </html>
 """

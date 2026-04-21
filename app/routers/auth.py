@@ -140,8 +140,8 @@ def logout_get(request: Request, response: Response) -> JSONResponse:
     response.delete_cookie("access_token")
     logger.info("DELETED access_token WITH ALL POSSIBLE PARAMETER COMBINATIONS")
     base = str(request.base_url).rstrip("/")
-    login_abs = f"{base}/login"
-    fire_event = c.FireEvent(event=GoToEvent(url=login_abs))
+    home_abs = f"{base}/"
+    fire_event = c.FireEvent(event=GoToEvent(url=home_abs))
     resp = JSONResponse([fire_event.model_dump(exclude_none=True, by_alias=True)])
     for key, value in response.headers.items():
         if key.lower() == "set-cookie":

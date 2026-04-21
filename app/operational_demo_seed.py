@@ -80,7 +80,8 @@ def _ensure_user(
         if row is None:
             raise
         return int(row["id"])
-    logger.info("Demo %s user: %s (password %s)", role.value, email_n, _DEMO_PASSWORD)
+    # Log creation but do not print the demo password to avoid accidental exposure
+    logger.info("Created demo %s user: %s", role.value, email_n)
     return uid
 
 
@@ -172,8 +173,12 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
         return
 
     db = DBSession(app_config.DB_PATH)
-    rider_ids = [_ensure_user(db, conn, email, UserRole.rider) for email in _RIDER_EMAILS]
-    driver_ids = [_ensure_user(db, conn, email, UserRole.driver) for email in _DRIVER_EMAILS]
+    rider_ids = [
+        _ensure_user(db, conn, email, UserRole.rider) for email in _RIDER_EMAILS
+    ]
+    driver_ids = [
+        _ensure_user(db, conn, email, UserRole.driver) for email in _DRIVER_EMAILS
+    ]
 
     for did, (lat, lng) in zip(driver_ids, _DRIVER_HOME, strict=True):
         db.upsert_driver_location(conn, did, lat, lng)
@@ -197,7 +202,9 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
     r_asg = _insert_ride_with_pickup_analytics(
         db, conn, rider_id=rider_ids[2], leg=_LEGS[2], status=RideStatus.bidding_open
     )
-    b_asg = _place_bid(db, conn, ride_id=r_asg, driver_id=driver_ids[0], fare_cents=1650)
+    b_asg = _place_bid(
+        db, conn, ride_id=r_asg, driver_id=driver_ids[0], fare_cents=1650
+    )
     _place_bid(db, conn, ride_id=r_asg, driver_id=driver_ids[3], fare_cents=1599)
     _accept_bid_core(db, conn, ride_id=r_asg, bid_id=b_asg)
 
@@ -213,7 +220,9 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
     r_done = _insert_ride_with_pickup_analytics(
         db, conn, rider_id=rider_ids[4], leg=_LEGS[4], status=RideStatus.bidding_open
     )
-    b_done = _place_bid(db, conn, ride_id=r_done, driver_id=driver_ids[2], fare_cents=1988)
+    b_done = _place_bid(
+        db, conn, ride_id=r_done, driver_id=driver_ids[2], fare_cents=1988
+    )
     _accept_bid_core(db, conn, ride_id=r_done, bid_id=b_done)
     db.update_ride(conn, r_done, status=RideStatus.in_progress)
     db.update_ride(
@@ -222,6 +231,8 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
         status=RideStatus.completed,
         final_fare_cents=1988,
         completed_at=now,
+        driver_marked_complete_at=now,
+        rider_marked_complete_at=now,
     )
 
     # 6) Cancelled
@@ -244,7 +255,9 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
     r_done2 = _insert_ride_with_pickup_analytics(
         db, conn, rider_id=rider_ids[0], leg=_LEGS[6], status=RideStatus.bidding_open
     )
-    b_done2 = _place_bid(db, conn, ride_id=r_done2, driver_id=driver_ids[3], fare_cents=1875)
+    b_done2 = _place_bid(
+        db, conn, ride_id=r_done2, driver_id=driver_ids[3], fare_cents=1875
+    )
     _accept_bid_core(db, conn, ride_id=r_done2, bid_id=b_done2)
     db.update_ride(conn, r_done2, status=RideStatus.in_progress)
     db.update_ride(
@@ -253,6 +266,8 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
         status=RideStatus.completed,
         final_fare_cents=1875,
         completed_at=now,
+        driver_marked_complete_at=now,
+        rider_marked_complete_at=now,
     )
 
     logger.info(

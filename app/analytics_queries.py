@@ -8,6 +8,15 @@ from pathlib import Path
 from app.schemas.analytics import CountByLabel, NycOverviewResponse, PickupTotals
 
 
+def _friendly_pickup_source(raw: str) -> str:
+    """Map ``pickups.source`` values to short UI labels."""
+    key = (raw or "").strip()
+    return {
+        "nyc_dataset": "TLC seed (Kaggle / FiveThirtyEight)",
+        "fruger_app": "Fruger ride requests (live)",
+    }.get(key, key or "(Unknown source)")
+
+
 def _connect(db_path: Path) -> sqlite3.Connection:
     if not db_path.is_file():
         raise FileNotFoundError(f"Database not found: {db_path}")
@@ -43,6 +52,20 @@ def fetch_overview(db_path: Path, top_n: int = 8) -> NycOverviewResponse:
 
         cur.execute("SELECT COUNT(DISTINCT TRIM(base_code)) FROM pickups WHERE TRIM(base_code) != ''")
         distinct_bases = int(cur.fetchone()[0])
+
+        cur.execute(
+            """
+            SELECT COALESCE(NULLIF(TRIM(source), ''), '(Unknown source)') AS label,
+                   COUNT(*) AS c
+            FROM pickups
+            GROUP BY COALESCE(NULLIF(TRIM(source), ''), '(Unknown source)')
+            ORDER BY c DESC
+            """
+        )
+        by_pickup_source = [
+            CountByLabel(label=_friendly_pickup_source(str(r["label"])), count=int(r["c"]))
+            for r in cur.fetchall()
+        ]
 
         cur.execute(
             """
@@ -129,6 +152,7 @@ def fetch_overview(db_path: Path, top_n: int = 8) -> NycOverviewResponse:
 
         return NycOverviewResponse(
             totals=totals,
+            by_pickup_source=by_pickup_source,
             by_borough=by_borough,
             by_base=by_base,
             by_hour=by_hour,

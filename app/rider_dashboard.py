@@ -203,8 +203,8 @@ def build_rider_dashboard(
                                     "Open rides only. Accepting a bid assigns the driver and closes the rest.",
                                     src=bids_src,
                                     iframe_title="Rider bids",
-                                    height=600,
-                                    iframe_class=f"{IFRAME_RIDER} min-h-[360px] lg:min-h-[520px]",
+                                    height=440,
+                                    iframe_class=f"{IFRAME_RIDER} min-h-[240px] lg:min-h-[340px]",
                                 ),
                                 _rider_embed_panel(
                                     "Request or cancel",

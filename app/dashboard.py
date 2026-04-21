@@ -96,8 +96,9 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
         build_navbar(user),
         c.Paragraph(
             text=(
-                "FiveThirtyEight TLC pickup seed data plus live Fruger ride requests "
-                "(not full trips — CSV feeds have no fare, distance, or drop-offs)."
+                "One pickups table in SQLite: TLC/Kaggle seed rows plus a new row for each "
+                "Fruger ride request, so demand analytics and map labels share the same stream. "
+                "Those CSVs are pickup-only (no fare); trip prices live on marketplace rides."
             ),
             class_name=BODY,
         ),
@@ -111,11 +112,6 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
         c.Heading(text="Charts", level=2, class_name=H2),
         build_chart_gallery(
             [
-                (
-                    "/api/v1/analytics/plots/borough.png",
-                    "Pickups by NYC borough",
-                    "Borough distribution",
-                ),
                 (
                     "/api/v1/analytics/plots/base.png",
                     "Pickups by TLC base code",
@@ -137,6 +133,9 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
 
     components.append(
         c.Heading(text="Breakdowns", level=2, class_name=BREAKDOWN_HEADING),
+    )
+    components.extend(
+        _table("Pickup stream (seed vs live, same table)", overview.by_pickup_source)
     )
     components.extend(_table("Pickups by TLC base", overview.by_base))
     components.extend(_table("Pickups by hour", overview.by_hour))

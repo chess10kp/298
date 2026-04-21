@@ -33,7 +33,7 @@ _ADMIN_FLEET_SHELL = (
     "border border-fruger-container bg-fruger-surface"
 )
 from app.schemas.analytics import NycOverviewResponse
-from app.schemas.operational import AdminStatsOut, UserPublic
+from app.schemas.operational import AdminStatsOut, RideStatus, UserPublic
 
 _MUTED = "text-xs font-medium uppercase tracking-wide text-fruger-muted"
 _STAT_VALUE = "font-display text-4xl font-extrabold tracking-tight text-fruger-on mt-2"
@@ -79,7 +79,23 @@ def build_admin_dashboard(
 ) -> list[AnyComponent]:
     rev_dollars = stats.completed_revenue_cents / 100.0
     rev_primary = f"${rev_dollars:,.2f}"
-    rev_hint = f"{stats.completed_revenue_cents:,} cents recorded on completed rides"
+    n = stats.revenue_ride_count
+    completed_total = stats.rides_by_status.get(RideStatus.completed.value, 0)
+    omitted = max(0, completed_total - n)
+    if n == 0:
+        rev_hint = (
+            "No completed marketplace rides with fares yet. "
+            "Pickup rows (seed + live) never carry fares—only rides do."
+        )
+    else:
+        trip_word = "trip" if n == 1 else "trips"
+        rev_hint = (
+            f"Marketplace fares only (rides table): final amounts on {n:,} completed {trip_word}. "
+            "Pickup seed rows track demand/location, not price."
+        )
+        if omitted:
+            oword = "ride" if omitted == 1 else "rides"
+            rev_hint += f" {omitted:,} completed {oword} omitted (no final_fare_cents in the database)."
 
     status_rows = [
         _RidesByStatusRow(status=_status_label(k), count=v)
@@ -132,12 +148,12 @@ def build_admin_dashboard(
                 _stat_tile(
                     label="Marketplace rides",
                     value=f"{stats.total_rides:,}",
-                    hint="In-app ride requests (SQLite rides table), not the NYC TLC CSV",
+                    hint="Trip lifecycle and fares (rides table); each request also appends a pickups row",
                 ),
                 _stat_tile(
-                    label="NYC pickup records",
+                    label="Pickup stream rows",
                     value=f"{stats.nyc_pickup_records:,}",
-                    hint="Historical TLC pickup events seeded for analytics only",
+                    hint="Single pickups table: TLC/Kaggle seed plus one analytics row per ride request",
                 ),
                 _stat_tile(
                     label="Total bids",
@@ -145,7 +161,7 @@ def build_admin_dashboard(
                     hint="Driver offers on rides",
                 ),
                 _stat_tile(
-                    label="Completed revenue",
+                    label="Fruger ride revenue",
                     value=rev_primary,
                     hint=rev_hint,
                 ),
@@ -155,13 +171,6 @@ def build_admin_dashboard(
         c.Div(
             class_name=CHART_CARD + " w-full max-w-none",
             components=[
-                c.Paragraph(
-                    text=(
-                        "Live driver positions (last reported GPS). "
-                        "A Google Maps API key enables the map tiles. Refreshes every 10s."
-                    ),
-                    class_name=_CARD_BLURB,
-                ),
                 *(
                     [
                         c.Div(
@@ -186,23 +195,11 @@ def build_admin_dashboard(
             ],
         ),
         *status_section,
-        c.Heading(text="Revenue by day (UTC)", level=2, class_name=H2),
-        c.Div(
-            class_name=CHART_CARD + " max-w-4xl",
-            components=[
-                c.Image(
-                    src="/api/v1/admin/plots/revenue.png",
-                    alt="Revenue by day",
-                    class_name=IMG + " w-full rounded-lg",
-                ),
-                c.Paragraph(
-                    text="Completed rides only · USD · UTC midnight boundaries",
-                    class_name=CHART_CAPTION,
-                ),
-            ],
-        ),
         *build_nyc_analytics_embedded_sections(
-            nyc_overview, nyc_error, request_base=request_base
+            nyc_overview,
+            nyc_error,
+            request_base=request_base,
+            include_reference_links=False,
         ),
         build_footer(),
     ]

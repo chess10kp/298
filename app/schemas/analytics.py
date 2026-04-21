@@ -1,7 +1,7 @@
-"""API models for NYC **pickup** analytics (TLC CSV seed + Fruger ride requests).
+"""API models for NYC **pickup** analytics.
 
-Seed data comes from FiveThirtyEight feeds (pickup time/place only). Riders append rows
-when they request rides (``source=fruger_app``). Charts aggregate both.
+All rows live in one ``pickups`` table: historical TLC/Kaggle seed points plus one
+analytics row per Fruger ride request (``source=fruger_app``). Charts aggregate both.
 """
 
 from pydantic import BaseModel, Field
@@ -30,9 +30,10 @@ class PickupTotals(BaseModel):
 
 
 class NycOverviewResponse(BaseModel):
-    """Dashboard + JSON payload aligned to the NYC Uber pickup CSVs."""
+    """Dashboard + JSON payload for the unified Fruger ``pickups`` stream."""
 
     totals: PickupTotals
+    by_pickup_source: list[CountByLabel]
     by_borough: list[CountByLabel]
     by_base: list[CountByLabel]
     by_hour: list[CountByLabel]

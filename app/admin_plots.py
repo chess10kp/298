@@ -16,7 +16,7 @@ def revenue_by_day_png(day_revenue: list[tuple[str, int]]) -> bytes:
         ax.text(
             0.5,
             0.5,
-            "No completed rides yet",
+            "No completed Fruger rides yet",
             ha="center",
             va="center",
             fontsize=13,
@@ -46,7 +46,7 @@ def revenue_by_day_png(day_revenue: list[tuple[str, int]]) -> bytes:
     ax.set_xticklabels(days, rotation=38, ha="right", fontsize=9)
     ax.set_ylabel("Revenue (USD)", labelpad=8)
     ax.set_xlabel("Day (UTC)", labelpad=8)
-    ax.set_title("Completed ride revenue by day", loc="left")
+    ax.set_title("Fruger marketplace revenue by day", loc="left")
     ax.yaxis.set_major_formatter(
         ticker.FuncFormatter(lambda v, _: f"${v:,.0f}" if v >= 1000 else f"${v:,.2f}")
     )

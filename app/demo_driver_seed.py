@@ -43,12 +43,22 @@ def run_driver_demo_seed(
                 role=UserRole.rider,
             )
             riders_out.append(
-                {"email": email, "user_id": uid, "user_created": True, "password": password}
+                {
+                    "email": email,
+                    "user_id": uid,
+                    "user_created": True,
+                    "password": password,
+                }
             )
         else:
             uid = int(row["id"])
             riders_out.append(
-                {"email": email, "user_id": uid, "user_created": False, "password": password}
+                {
+                    "email": email,
+                    "user_id": uid,
+                    "user_created": False,
+                    "password": password,
+                }
             )
 
         plat, plng, dlat, dlng = _DEMO_LEGS[i % len(_DEMO_LEGS)]
@@ -66,14 +76,11 @@ def run_driver_demo_seed(
     p0_lat, p0_lng, _, _ = _DEMO_LEGS[0]
     db.upsert_driver_location(conn, driver_id, p0_lat, p0_lng)
 
+    # Return a neutral message (avoid leaking demo credentials in API responses)
     return {
         "ok": True,
         "riders": riders_out,
         "ride_ids": ride_ids,
         "driver_location_set": True,
-        "message": (
-            "Added open rides for demo riders; your GPS in the DB is set near the first pickup "
-            "so you can bid immediately. Demo logins: fruger-demo-rider-1@local.dev / "
-            "fruger-demo-rider-2@local.dev (password Demopass123)."
-        ),
+        "message": "Added open rides for demo riders and set driver location in the DB.",
     }

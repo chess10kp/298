@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.deps import get_current_user_optional
 from app.embed_html import driver_hub_document_html
 from app.fastui_html import fruger_prebuilt_html
-from app.login_html import render_login_page
+from app.login_html import render_landing_page, render_login_page, render_register_page
 from app.schemas.operational import UserPublic, UserRole
 
 router = APIRouter(tags=["pages"])
@@ -36,7 +36,7 @@ def _safe_next_url(raw: str | None) -> str:
 @router.get("/")
 def home_page(user: Annotated[UserPublic | None, Depends(get_current_user_optional)]):
     if user is None:
-        return RedirectResponse(url="/login?next=/", status_code=status.HTTP_302_FOUND)
+        return HTMLResponse(render_landing_page())
     if user.role == UserRole.rider:
         return _shell("Rider hub — Fruger")
     if user.role == UserRole.driver:
@@ -63,6 +63,15 @@ def login_page(
 ):
     next_url = _safe_next_url(request.query_params.get("next"))
     return HTMLResponse(render_login_page(user=user, next_url=next_url))
+
+
+@router.get("/register")
+def register_page(
+    request: Request,
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
+    next_url = _safe_next_url(request.query_params.get("next"))
+    return HTMLResponse(render_register_page(user=user, next_url=next_url))
 
 
 @router.get("/driver")

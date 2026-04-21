@@ -9,6 +9,8 @@ from typing import Any, Iterator
 
 from app.schemas.operational import BidStatus, RideStatus, UserRole
 
+_MISSING = object()
+
 
 class DBSession:
     """Thin repository over SQLite for users, rides, bids, driver locations."""
@@ -102,7 +104,8 @@ class DBSession:
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at
+                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
+                   driver_marked_complete_at, rider_marked_complete_at
             FROM rides WHERE id = ?
             """,
             (ride_id,),
@@ -117,7 +120,8 @@ class DBSession:
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at
+                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
+                   driver_marked_complete_at, rider_marked_complete_at
             FROM rides WHERE rider_id = ? ORDER BY id DESC
             """,
             (rider_id,),
@@ -131,10 +135,30 @@ class DBSession:
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at
+                   status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
+                   driver_marked_complete_at, rider_marked_complete_at
             FROM rides WHERE status = ? ORDER BY id DESC
             """,
             (status.value,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def list_rides_for_assigned_driver(
+        self, conn: sqlite3.Connection, driver_id: int
+    ) -> list[dict[str, Any]]:
+        """Rides where this driver won the bid and the trip is assigned or in progress."""
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT r.id, r.rider_id, r.pickup_lat, r.pickup_lng, r.dropoff_lat, r.dropoff_lng,
+                   r.status, r.accepted_bid_id, r.final_fare_cents, r.created_at, r.cancelled_at,
+                   r.completed_at, r.driver_marked_complete_at, r.rider_marked_complete_at
+            FROM rides r
+            INNER JOIN bids b ON b.id = r.accepted_bid_id
+            WHERE b.driver_id = ? AND r.status IN ('assigned', 'in_progress')
+            ORDER BY r.id DESC
+            """,
+            (driver_id,),
         )
         return [dict(r) for r in cur.fetchall()]
 
@@ -148,6 +172,8 @@ class DBSession:
         final_fare_cents: int | None = None,
         cancelled_at: str | None = None,
         completed_at: str | None = None,
+        driver_marked_complete_at: str | None | object = _MISSING,
+        rider_marked_complete_at: str | None | object = _MISSING,
     ) -> None:
         fields: list[str] = []
         vals: list[Any] = []
@@ -166,10 +192,26 @@ class DBSession:
         if completed_at is not None:
             fields.append("completed_at = ?")
             vals.append(completed_at)
+        if driver_marked_complete_at is not _MISSING:
+            fields.append("driver_marked_complete_at = ?")
+            vals.append(driver_marked_complete_at)
+        if rider_marked_complete_at is not _MISSING:
+            fields.append("rider_marked_complete_at = ?")
+            vals.append(rider_marked_complete_at)
         if not fields:
             return
         vals.append(ride_id)
         conn.execute(f"UPDATE rides SET {', '.join(fields)} WHERE id = ?", vals)
+
+    def clear_ride_completion_marks(self, conn: sqlite3.Connection, ride_id: int) -> None:
+        conn.execute(
+            """
+            UPDATE rides
+            SET driver_marked_complete_at = NULL, rider_marked_complete_at = NULL
+            WHERE id = ?
+            """,
+            (ride_id,),
+        )
 
     # --- bids ---
     def upsert_bid(
@@ -354,16 +396,19 @@ class DBSession:
         cur.execute("SELECT status, COUNT(*) FROM rides GROUP BY status")
         return {str(row[0]): int(row[1]) for row in cur.fetchall()}
 
-    def sum_completed_revenue_cents(self, conn: sqlite3.Connection) -> int:
+    def completed_revenue_totals(self, conn: sqlite3.Connection) -> tuple[int, int]:
+        """Sum and ride count for completed trips that have ``final_fare_cents`` set."""
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT COALESCE(SUM(final_fare_cents), 0) FROM rides
+            SELECT COALESCE(SUM(final_fare_cents), 0), COUNT(*)
+            FROM rides
             WHERE status = ? AND final_fare_cents IS NOT NULL
             """,
             (RideStatus.completed.value,),
         )
-        return int(cur.fetchone()[0])
+        row = cur.fetchone()
+        return int(row[0]), int(row[1])
 
     def count_bids_total(self, conn: sqlite3.Connection) -> int:
         cur = conn.cursor()

@@ -18,6 +18,7 @@ from app.routers.auth import router as auth_router
 from app.routers.driver import router as driver_router
 from app.routers.embed import router as embed_router
 from app.routers.fruger_fastui import router as fruger_fastui_router
+from app.routers.geocode import router as geocode_router
 from app.routers.pages import router as pages_router
 from app.routers.rider_ui import router as rider_ui_router
 from app.routers.rides import router as rides_router
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     db_path = app_config.DB_PATH
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    # Remember whether the DB file existed before startup so we can perform
+    # one-time actions (like seeding driver demo data) only for fresh DBs.
+    db_was_missing = not db_path.exists()
     if not app_config.SKIP_DATASET_SEED:
         if not db_path.exists():
             logger.info("Creating database at %s; running dataset seed.", db_path)
@@ -67,6 +71,54 @@ async def lifespan(app: FastAPI):
         seed_optional_admin(conn)
         seed_default_accounts(conn)
         seed_operational_demo_if_empty(conn)
+        # If the DB was absent on startup and DRIVER_DEMO_SEED is enabled,
+        # run the smaller driver demo seed so the driver UI can immediately
+        # show open rides. We attach the demo GPS to the default driver
+        # account (created by seed_default_accounts above) so a driver who
+        # logs in as the default driver will see nearby rides.
+        if db_was_missing and app_config.DRIVER_DEMO_SEED:
+            try:
+                # Ensure a dedicated demo driver account exists and use it to
+                # attach GPS for the auto demo seed. This keeps the demo user
+                # separate from the default driver credentials used by prod.
+                demo_driver_email = "fruger-demo-driver@local.dev"
+                from app.demo_driver_seed import run_driver_demo_seed
+                from app.services.auth_service import AuthService
+                from app.schemas.operational import UserRole
+
+                db = DBSession(app_config.DB_PATH)
+                auth = AuthService()
+
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT id FROM users WHERE email = ? LIMIT 1",
+                    (demo_driver_email.strip().lower(),),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    # Create the demo driver with a known demo password.
+                    demo_password = "FrugerDemo2024!"
+                    uid = db.insert_user(
+                        conn,
+                        email=demo_driver_email,
+                        password_hash=auth.hash_password(demo_password),
+                        role=UserRole.driver,
+                    )
+                    driver_id_to_use = int(uid)
+                    logger.info(
+                        "Created demo driver account %s (password %s)",
+                        demo_driver_email,
+                        demo_password,
+                    )
+                else:
+                    driver_id_to_use = int(row[0])
+
+                logger.info(
+                    "Running driver demo seed for demo driver %s", demo_driver_email
+                )
+                run_driver_demo_seed(conn, db, auth, driver_id=driver_id_to_use)
+            except Exception:
+                logger.exception("Automatic driver demo seed failed")
         conn.commit()
     finally:
         conn.close()
@@ -97,6 +149,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Fruger — rides & NYC pickup analytics", lifespan=lifespan)
 
 app.include_router(auth_router)
+app.include_router(geocode_router)
 app.include_router(rides_router)
 app.include_router(driver_router)
 app.include_router(admin_router)

@@ -58,6 +58,11 @@ def open_rides(conn: Conn, _: DriverUser, rides: Rs) -> list[RideOut]:
     return rides.list_open_rides(conn)
 
 
+@router.get("/driver/active", response_model=list[RideOut])
+def driver_active_rides(conn: Conn, driver: DriverUser, rides: Rs) -> list[RideOut]:
+    return rides.list_active_rides_for_driver(conn, driver.id)
+
+
 @router.get("/{ride_id}", response_model=RideOut)
 def get_ride(
     ride_id: int,
@@ -228,6 +233,16 @@ def start_ride(
     rides: Rs,
 ) -> RideOut:
     return rides.start_ride(conn, ride_id, driver.id)
+
+
+@router.post("/{ride_id}/rider-complete", response_model=RideOut)
+def rider_complete_ride(
+    ride_id: int,
+    conn: Conn,
+    rider: RiderUser,
+    rides: Rs,
+) -> RideOut:
+    return rides.rider_complete_ride(conn, ride_id, rider.id)
 
 
 @router.post("/{ride_id}/complete", response_model=RideOut)

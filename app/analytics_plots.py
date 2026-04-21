@@ -90,12 +90,6 @@ def _rows_horizontal(rows: list[CountByLabel], *, title: str, xlabel: str, max_b
     return _horizontal_bars_png(labels, values, title=title, xlabel=xlabel)
 
 
-def borough_chart_png(rows: list[CountByLabel]) -> bytes:
-    return _rows_horizontal(
-        rows, title="Pickups by NYC borough", xlabel="Pickups", max_bars=14
-    )
-
-
 def base_chart_png(rows: list[CountByLabel]) -> bytes:
     return _rows_horizontal(
         rows, title="Pickups by TLC base code", xlabel="Pickups", max_bars=12

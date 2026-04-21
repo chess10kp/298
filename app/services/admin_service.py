@@ -15,10 +15,12 @@ class AdminService:
 
     def overview_stats(self, conn: sqlite3.Connection) -> AdminStatsOut:
         by_status = self._db.count_rides_by_status(conn)
+        rev_cents, rev_rides = self._db.completed_revenue_totals(conn)
         return AdminStatsOut(
             total_rides=self._db.count_rides_total(conn),
             rides_by_status=by_status,
-            completed_revenue_cents=self._db.sum_completed_revenue_cents(conn),
+            completed_revenue_cents=rev_cents,
+            revenue_ride_count=rev_rides,
             total_bids=self._db.count_bids_total(conn),
             nyc_pickup_records=self._db.count_pickups_rows(conn),
         )

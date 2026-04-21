@@ -19,6 +19,8 @@ class RideService:
 
     @staticmethod
     def ride_from_row(row: dict, conn: sqlite3.Connection | None = None) -> RideOut:
+        dma = row.get("driver_marked_complete_at")
+        rma = row.get("rider_marked_complete_at")
         out = RideOut(
             id=int(row["id"]),
             rider_id=int(row["rider_id"]),
@@ -32,10 +34,42 @@ class RideService:
             created_at=str(row["created_at"]),
             cancelled_at=str(row["cancelled_at"]) if row["cancelled_at"] is not None else None,
             completed_at=str(row["completed_at"]) if row["completed_at"] is not None else None,
+            driver_marked_complete_at=str(dma) if dma is not None else None,
+            rider_marked_complete_at=str(rma) if rma is not None else None,
         )
         if conn is not None:
             return attach_pickup_dataset_labels(conn, out)
         return out
+
+    def _finalize_completed_ride(self, conn: sqlite3.Connection, ride_id: int, ride: dict) -> RideOut:
+        aid = ride["accepted_bid_id"]
+        if aid is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No accepted bid",
+            )
+        bid = self._db.get_bid(conn, int(aid))
+        if bid is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No accepted bid",
+            )
+        now = datetime.now(timezone.utc).isoformat()
+        fare = (
+            int(ride["final_fare_cents"])
+            if ride["final_fare_cents"] is not None
+            else int(bid["fare_cents"])
+        )
+        self._db.update_ride(
+            conn,
+            ride_id,
+            status=RideStatus.completed,
+            final_fare_cents=fare,
+            completed_at=now,
+        )
+        row = self._db.get_ride(conn, ride_id)
+        assert row is not None
+        return self.ride_from_row(row, conn)
 
     def request_ride(self, conn: sqlite3.Connection, rider_id: int, body: RideCreate) -> RideOut:
         rid = self._db.insert_ride(
@@ -94,6 +128,12 @@ class RideService:
         rows = self._db.list_rides_with_status(conn, RideStatus.bidding_open)
         return [self.ride_from_row(r, conn) for r in rows]
 
+    def list_active_rides_for_driver(
+        self, conn: sqlite3.Connection, driver_id: int
+    ) -> list[RideOut]:
+        rows = self._db.list_rides_for_assigned_driver(conn, driver_id)
+        return [self.ride_from_row(r, conn) for r in rows]
+
     def get_ride(self, conn: sqlite3.Connection, ride_id: int) -> RideOut:
         row = self._db.get_ride(conn, ride_id)
         if row is None:
@@ -116,11 +156,13 @@ class RideService:
         if bid is None or int(bid["driver_id"]) != driver_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the assigned driver")
         self._db.update_ride(conn, ride_id, status=RideStatus.in_progress)
+        self._db.clear_ride_completion_marks(conn, ride_id)
         row = self._db.get_ride(conn, ride_id)
         assert row is not None
         return self.ride_from_row(row, conn)
 
     def complete_ride(self, conn: sqlite3.Connection, ride_id: int, driver_id: int) -> RideOut:
+        """Driver confirms trip finished; ride completes only after rider confirms too."""
         ride = self._db.get_ride(conn, ride_id)
         if ride is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
@@ -135,15 +177,38 @@ class RideService:
         bid = self._db.get_bid(conn, int(aid))
         if bid is None or int(bid["driver_id"]) != driver_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the assigned driver")
+        if ride.get("driver_marked_complete_at"):
+            row = self._db.get_ride(conn, ride_id)
+            assert row is not None
+            return self.ride_from_row(row, conn)
         now = datetime.now(timezone.utc).isoformat()
-        fare = int(ride["final_fare_cents"]) if ride["final_fare_cents"] is not None else int(bid["fare_cents"])
-        self._db.update_ride(
-            conn,
-            ride_id,
-            status=RideStatus.completed,
-            final_fare_cents=fare,
-            completed_at=now,
-        )
+        self._db.update_ride(conn, ride_id, driver_marked_complete_at=now)
         row = self._db.get_ride(conn, ride_id)
         assert row is not None
+        if row.get("rider_marked_complete_at"):
+            return self._finalize_completed_ride(conn, ride_id, dict(row))
+        return self.ride_from_row(row, conn)
+
+    def rider_complete_ride(self, conn: sqlite3.Connection, ride_id: int, rider_id: int) -> RideOut:
+        """Rider confirms trip finished; ride completes only after driver confirms too."""
+        ride = self._db.get_ride(conn, ride_id)
+        if ride is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
+        if int(ride["rider_id"]) != rider_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your ride")
+        if str(ride["status"]) != RideStatus.in_progress.value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ride must be in progress to confirm completion",
+            )
+        if ride.get("rider_marked_complete_at"):
+            row = self._db.get_ride(conn, ride_id)
+            assert row is not None
+            return self.ride_from_row(row, conn)
+        now = datetime.now(timezone.utc).isoformat()
+        self._db.update_ride(conn, ride_id, rider_marked_complete_at=now)
+        row = self._db.get_ride(conn, ride_id)
+        assert row is not None
+        if row.get("driver_marked_complete_at"):
+            return self._finalize_completed_ride(conn, ride_id, dict(row))
         return self.ride_from_row(row, conn)

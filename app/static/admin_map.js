@@ -31,14 +31,16 @@
   }
 
   async function refreshLocations() {
-    const el = document.getElementById('fleet-out');
+    const fleetOut = document.getElementById('fleet-out');
+    const setFleetText = (text) => {
+      if (fleetOut) fleetOut.textContent = text;
+    };
     try {
       const locs = await api('/api/v1/admin/driver-locations');
-      if (el) {
-        el.textContent = JSON.stringify(locs, null, 2);
-      }
+      setFleetText(JSON.stringify(locs, null, 2));
 
       if (!map || !window.google || !google.maps) return;
+      if (!Array.isArray(locs)) return;
 
       clearMarkers();
       const bounds = new google.maps.LatLngBounds();
@@ -62,19 +64,18 @@
       });
       if (locs.length > 0) map.fitBounds(bounds);
     } catch (e) {
-      if (el) {
-        el.textContent = 'Could not load locations: ' + e.message;
-      }
+      setFleetText('Could not load locations: ' + e.message);
     }
   }
 
   window.initAdminMap = function () {
-    const el = document.getElementById('admin-map');
+    const mapEl = document.getElementById('admin-map');
+    if (!mapEl) return;
     if (!window.google || !google.maps) {
-      el.textContent = 'Maps failed to load.';
+      mapEl.textContent = 'Maps failed to load.';
       return;
     }
-    map = new google.maps.Map(el, {
+    map = new google.maps.Map(mapEl, {
       center: { lat: 40.7128, lng: -74.006 },
       zoom: 11,
     });
@@ -84,7 +85,7 @@
       } catch (_) {}
     }
     if (typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(() => nudgeResize()).observe(el);
+      new ResizeObserver(() => nudgeResize()).observe(mapEl);
     }
     requestAnimationFrame(nudgeResize);
     setTimeout(nudgeResize, 50);

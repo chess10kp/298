@@ -895,6 +895,10 @@ html.driver-embed.driver-embed--framed .embed-navbar {
   display: none;
 }
 
+html.driver-embed.driver-embed--framed .embed-site-footer {
+  display: none;
+}
+
 body.tool-page.driver-layout {
   min-height: 100dvh;
   height: 100dvh;
@@ -988,6 +992,33 @@ body.admin-map-embed #admin-map.tool-map.admin-map-embed__map {
   height: auto !important;
   margin-top: var(--space-2);
   margin-bottom: 0;
+}
+
+/* Navbar + site footer participate in the column flex; keep map between chrome and footer. */
+body.admin-map-embed > .embed-navbar,
+body.admin-map-embed > .embed-site-footer {
+  flex-shrink: 0;
+}
+
+/* Standalone admin map: match rider embed chrome (full-width bar, no side gap on nav). */
+body.tool-page.admin-map-embed > .embed-navbar {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-container-lowest);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+/* Fleet map inside FastUI iframe: parent shell has chrome; hide duplicate nav/footer. */
+html.admin-embed.admin-embed--framed .embed-navbar,
+html.admin-embed.admin-embed--framed .embed-site-footer {
+  display: none;
+}
+
+html.admin-embed.admin-embed--framed body.admin-map-embed {
+  padding-top: var(--space-2);
+  min-height: 0;
 }
 
 .tool-controls {
@@ -1121,6 +1152,35 @@ body.admin-map-embed #admin-map.tool-map.admin-map-embed__map {
 
 .fruger-data-table tbody tr:hover td {
   background: var(--surface-container-lowest);
+}
+
+/* Embed pages: same table shell as FastUI admin/rider (TABLE_WRAP). */
+.embed-table-wrap {
+  width: 100%;
+  max-width: none;
+  border-radius: 0.75rem;
+  background: var(--surface-container-lowest);
+  box-shadow: var(--shadow-float);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--outline-variant);
+  padding: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .embed-table-wrap {
+    padding: 1.25rem 1.25rem;
+  }
+}
+
+.embed-table-wrap .fruger-data-table {
+  margin: 0;
+}
+
+/* Rider embed “Your rides”: last column is actions (admin tables use last col for counts). */
+.rider-actions-main .embed-table-wrap .fruger-data-table thead th:last-child,
+.rider-actions-main .embed-table-wrap .fruger-data-table tbody td:last-child {
+  text-align: left;
 }
 
 /* Rider dashboard — trips table */
@@ -1258,4 +1318,221 @@ body.admin-map-embed #admin-map.tool-map.admin-map-embed__map {
   border-radius: var(--radius-md);
   padding: var(--space-4);
   max-width: 40rem;
+}
+
+/* Landing page */
+.landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 150;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.landing-header__inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-3) clamp(var(--space-2), 4vw, var(--space-6));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.landing-main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 clamp(var(--space-2), 4vw, var(--space-6));
+}
+
+.landing-hero {
+  padding: clamp(3rem, 10vh, 7rem) 0 var(--space-6);
+  max-width: 40rem;
+}
+
+.landing-hero__eyebrow {
+  margin: 0 0 var(--space-2);
+}
+
+.landing-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin: 0 0 var(--space-3);
+  color: var(--on-surface);
+}
+
+.landing-hero__lede {
+  font-size: 1.125rem;
+  line-height: 1.65;
+  color: var(--on-surface-variant);
+  max-width: 34rem;
+  margin: 0 0 var(--space-4);
+}
+
+.landing-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.btn--lg {
+  font-size: 1rem;
+  padding: 0.75rem 1.75rem;
+}
+
+.landing-section {
+  padding: var(--space-4) 0;
+}
+
+.landing-cta {
+  text-align: center;
+  padding: var(--space-6) 0;
+  margin: var(--space-4) 0;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.landing-cta__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 var(--space-2);
+  color: var(--on-surface);
+}
+
+.landing-footer {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-4) clamp(var(--space-2), 4vw, var(--space-6));
+  border-top: 1px solid var(--outline-variant);
+}
+
+/* Onboarding banner dismiss state */
+.fruger-onboarding-banner {
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+html.fruger-onboarding-dismissed .fruger-onboarding-banner {
+  opacity: 0 !important;
+  transform: translateY(-8px) scale(0.995);
+  pointer-events: none;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* /embed/rider/actions — full-page shell (navbar + centered main + footer) */
+body.tool-page.rider-actions-layout {
+  min-height: 100dvh;
+  padding: 0;
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0));
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+body.tool-page.rider-actions-layout > .embed-navbar {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2) 0;
+  background: var(--surface-container-lowest);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.rider-embed-navbar .rider-embed-navbar__inner {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+}
+
+body.tool-page.rider-actions-layout .rider-actions-main {
+  flex: 1 0 auto;
+  max-width: 52rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  box-sizing: border-box;
+}
+
+/* Shared embed footer (driver / rider / admin map) — HTML uses .embed-site-footer */
+.embed-site-footer,
+.rider-embed-footer {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  border-top: 1px solid var(--outline-variant);
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-low);
+  box-sizing: border-box;
+}
+
+.embed-site-footer__links,
+.rider-embed-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  margin: 0 0 var(--space-2);
+}
+
+.embed-site-footer__links a,
+.rider-embed-footer__links a {
+  color: var(--secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.embed-site-footer__links a:hover,
+.rider-embed-footer__links a:hover {
+  text-decoration: underline;
+}
+
+.embed-site-footer__sep,
+.rider-embed-footer__sep {
+  color: var(--outline-variant);
+  user-select: none;
+}
+
+.embed-site-footer__copy,
+.rider-embed-footer__copy {
+  margin: 0;
+  font-size: 0.8125rem;
+  opacity: 0.88;
+}
+
+body.tool-page.rider-actions-layout > .embed-site-footer,
+body.tool-page.rider-actions-layout > .rider-embed-footer {
+  margin-top: auto;
+}
+
+body.tool-page.driver-layout > .embed-site-footer {
+  margin-top: auto;
+}
+
+html.rider-actions-embed.rider-actions-embed--framed .embed-navbar {
+  display: none;
+}
+
+html.rider-actions-embed.rider-actions-embed--framed body.rider-actions-layout {
+  min-height: 0;
+  background: transparent;
+}
+
+html.rider-actions-embed.rider-actions-embed--framed .rider-actions-main {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+html.rider-actions-embed.rider-actions-embed--framed .embed-site-footer,
+html.rider-actions-embed.rider-actions-embed--framed .rider-embed-footer {
+  display: none;
 }

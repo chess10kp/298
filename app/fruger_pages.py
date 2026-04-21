@@ -62,11 +62,7 @@ def _outline_link(
 ) -> AnyComponent:
     """Open JSON or static assets via full document load (not FastUI JSON fetch)."""
     href = _full_navigation_url(request_base, url)
-    evt = (
-        GoToEvent(url=href, target="_blank")
-        if new_tab
-        else GoToEvent(url=href)
-    )
+    evt = GoToEvent(url=href, target="_blank") if new_tab else GoToEvent(url=href)
     return c.Link(
         components=[c.Text(text=text)],
         on_click=evt,
@@ -83,7 +79,10 @@ def build_api_home_guest(user: UserPublic | None = None) -> list[AnyComponent]:
                 build_navbar(user),
                 c.Heading(text="Fruger", level=1, class_name=H1),
                 c.Paragraph(
-                    text="Maps, ride flow, and the NYC pickup dataset. Sign in to open dashboards.",
+                    text=(
+                        "Reliable rides, transparent fares, and real-time driver routing. "
+                        "Sign in to manage trips, view offers, and access analytics."
+                    ),
                     class_name=BODY,
                 ),
                 _link_label("Sign in", "/login?next=/"),
@@ -101,7 +100,7 @@ def build_api_home(user: UserPublic) -> list[AnyComponent]:
             components=[
                 c.Heading(text="NYC pickup analytics", level=3, class_name=_CARD_TITLE),
                 c.Paragraph(
-                    text="Charts and breakdowns from the FiveThirtyEight Uber pickup feed.",
+                    text="Interactive charts and breakdowns of historical and live pickup activity.",
                     class_name=_CARD_BLURB,
                 ),
                 c.Paragraph(text="Open →", class_name=_CARD_CTA),
@@ -179,6 +178,34 @@ def build_api_home(user: UserPublic) -> list[AnyComponent]:
                         ),
                     ],
                 ),
+                # Lightweight onboarding banner to orient new users
+                c.Div(
+                    class_name="fruger-onboarding-banner max-w-6xl mx-auto px-4 py-3 bg-fruger-surface rounded my-4",
+                    components=[
+                        c.Div(
+                            class_name="flex items-start justify-between",
+                            components=[
+                                c.Div(
+                                    components=[
+                                        c.Heading(text="Welcome to Fruger", level=3),
+                                        c.Paragraph(
+                                            text=(
+                                                "Get started by requesting a ride, browsing bids, or opening the "
+                                                "driver map. Need help? Visit the Contact page."
+                                            ),
+                                            class_name="text-sm text-fruger-muted mt-1",
+                                        ),
+                                    ],
+                                ),
+                                c.Link(
+                                    components=[c.Text(text="Get started")],
+                                    on_click=GoToEvent(url="/"),
+                                    class_name="btn btn--primary fruger-onboarding-dismiss",
+                                ),
+                            ],
+                        )
+                    ],
+                ),
                 c.Div(
                     class_name=(
                         "grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
@@ -225,9 +252,9 @@ def _nyc_pickup_dataset_body(overview: NycOverviewResponse) -> list[AnyComponent
     parts: list[AnyComponent] = [
         c.Paragraph(
             text=(
-                "Historical TLC-style pickups from FiveThirtyEight (seed baseline), "
-                "plus new pickup points whenever riders request rides in Fruger. "
-                "Neither source includes full trips: no fare, distance, or drop-offs in the CSV feeds."
+                "Explore aggregate pickup activity alongside live ride requests to understand "
+                "demand patterns and operational performance. Use the visualizations below to "
+                "drill into time-of-day trends, hot zones, and base-level dispatching metrics."
             ),
             class_name=f"{BODY} max-w-2xl",
         ),
@@ -290,16 +317,11 @@ def _nyc_pickup_dataset_body(overview: NycOverviewResponse) -> list[AnyComponent
         ),
         c.Heading(text="Charts", level=2, class_name=H2),
         c.Paragraph(
-            text="PNG exports rendered with the Fruger palette — open any card in a new tab via the links below.",
+            text="Charts are available for quick export — open any visualization in a new tab using the links below.",
             class_name=f"{BODY} max-w-2xl mb-2",
         ),
         build_chart_gallery(
             [
-                (
-                    "/api/v1/analytics/plots/borough.png",
-                    "Pickups by NYC borough",
-                    "Borough distribution",
-                ),
                 (
                     "/api/v1/analytics/plots/base.png",
                     "Pickups by TLC base code",
@@ -319,11 +341,8 @@ def _nyc_pickup_dataset_body(overview: NycOverviewResponse) -> list[AnyComponent
         ),
         c.Heading(text="Breakdowns", level=2, class_name=BREAKDOWN_HEADING),
     ]
-    parts.extend(_analytics_table("By borough", overview.by_borough))
     parts.extend(_analytics_table("By TLC base", overview.by_base))
     parts.extend(_analytics_table("By hour", overview.by_hour))
-    parts.extend(_analytics_table("Top TLC zones", overview.top_zones))
-    parts.extend(_analytics_table("By data source era", overview.by_data_source))
     parts.extend(_analytics_table("Pickups by date (sample)", overview.pickups_by_date))
     return parts
 
@@ -358,12 +377,6 @@ def _nyc_analytics_reference_links(
             class_name="flex flex-wrap gap-3 items-center",
             components=[
                 _outline_link(
-                    "Borough",
-                    "/api/v1/analytics/plots/borough.png",
-                    request_base=request_base,
-                    new_tab=True,
-                ),
-                _outline_link(
                     "Base",
                     "/api/v1/analytics/plots/base.png",
                     request_base=request_base,
@@ -383,10 +396,6 @@ def _nyc_analytics_reference_links(
                 ),
             ],
         ),
-        c.Paragraph(
-            text="Links open in a new tab (full GET) so chart images and JSON are not loaded as FastUI routes.",
-            class_name="text-xs text-fruger-muted mt-2",
-        ),
     ]
 
 
@@ -395,6 +404,7 @@ def build_nyc_analytics_embedded_sections(
     analytics_error: str | None,
     *,
     request_base: str | None = None,
+    include_reference_links: bool = True,
 ) -> list[AnyComponent]:
     """NYC pickups content for embedding (e.g. admin console); no navbar or page title."""
     parts: list[AnyComponent] = [
@@ -415,7 +425,8 @@ def build_nyc_analytics_embedded_sections(
         ),
     )
     parts.extend(_nyc_pickup_dataset_body(overview))
-    parts.extend(_nyc_analytics_reference_links(request_base))
+    if include_reference_links:
+        parts.extend(_nyc_analytics_reference_links(request_base))
     return parts
 
 

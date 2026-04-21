@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 def _get_user_version(conn: sqlite3.Connection) -> int:
@@ -31,6 +31,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         _migrate_2_pickups_source(conn)
         _set_user_version(conn, 2)
         v = 2
+    if v < 3:
+        _migrate_3_dual_completion(conn)
+        _set_user_version(conn, 3)
+        v = 3
     if v != CURRENT_SCHEMA_VERSION:
         logger.warning(
             "Schema version %s is behind code version %s; migrations may need updating.",
@@ -132,3 +136,28 @@ def _migrate_2_pickups_source(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE pickups ADD COLUMN source TEXT DEFAULT 'nyc_dataset'"
         )
+
+
+def _migrate_3_dual_completion(conn: sqlite3.Connection) -> None:
+    """Driver and rider must both confirm before status becomes completed."""
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(rides)")
+    cols = {row[1] for row in cur.fetchall()}
+    if "driver_marked_complete_at" not in cols:
+        conn.execute(
+            "ALTER TABLE rides ADD COLUMN driver_marked_complete_at TEXT"
+        )
+    if "rider_marked_complete_at" not in cols:
+        conn.execute(
+            "ALTER TABLE rides ADD COLUMN rider_marked_complete_at TEXT"
+        )
+    conn.execute(
+        """
+        UPDATE rides
+        SET driver_marked_complete_at = completed_at,
+            rider_marked_complete_at = completed_at
+        WHERE status = 'completed'
+          AND completed_at IS NOT NULL
+          AND driver_marked_complete_at IS NULL
+        """
+    )

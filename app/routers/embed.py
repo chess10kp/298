@@ -58,7 +58,10 @@ def embed_admin_map(
         )
     key = _maps_key()
     body = admin_map_embed(key) if key else admin_map_embed_no_key()
-    return HTMLResponse(body)
+    return HTMLResponse(
+        body,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/embed/rider/actions", response_class=HTMLResponse)
