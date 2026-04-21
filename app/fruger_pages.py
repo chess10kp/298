@@ -9,7 +9,7 @@ from fastui import components as c
 from fastui.components.display import DisplayLookup
 from fastui.events import GoToEvent
 
-from app.components import build_chart_gallery, build_footer, build_navbar
+from app.components import build_footer, build_navbar
 from app.fruger_tailwind import (
     BODY,
     BREAKDOWN_HEADING,
@@ -315,30 +315,6 @@ def _nyc_pickup_dataset_body(overview: NycOverviewResponse) -> list[AnyComponent
                 ),
             ],
         ),
-        c.Heading(text="Charts", level=2, class_name=H2),
-        c.Paragraph(
-            text="Charts are available for quick export — open any visualization in a new tab using the links below.",
-            class_name=f"{BODY} max-w-2xl mb-2",
-        ),
-        build_chart_gallery(
-            [
-                (
-                    "/api/v1/analytics/plots/base.png",
-                    "Pickups by TLC base code",
-                    "Dispatching base codes",
-                ),
-                (
-                    "/api/v1/analytics/plots/hour.png",
-                    "Pickups by hour of day",
-                    "Demand through the day",
-                ),
-                (
-                    "/api/v1/analytics/plots/pickups-by-date.png",
-                    "Pickups by date",
-                    "Timeline (sample of dates)",
-                ),
-            ]
-        ),
         c.Heading(text="Breakdowns", level=2, class_name=BREAKDOWN_HEADING),
     ]
     parts.extend(_analytics_table("By TLC base", overview.by_base))
@@ -350,7 +326,7 @@ def _nyc_pickup_dataset_body(overview: NycOverviewResponse) -> list[AnyComponent
 def _nyc_analytics_reference_links(
     request_base: str | None = None,
 ) -> list[AnyComponent]:
-    """PNG / raw JSON must use absolute URLs + new tab so the client does not SPA-fetch them."""
+    """Raw JSON references for debugging/export."""
     return [
         c.Div(
             class_name="flex flex-wrap gap-3 items-center mt-6",
@@ -364,33 +340,6 @@ def _nyc_analytics_reference_links(
                 _outline_link(
                     "This view as FastUI JSON",
                     "/api/nyc",
-                    request_base=request_base,
-                    new_tab=True,
-                ),
-            ],
-        ),
-        c.Paragraph(
-            text="Charts as PNG files:",
-            class_name="text-xs font-semibold text-fruger-muted mt-4",
-        ),
-        c.Div(
-            class_name="flex flex-wrap gap-3 items-center",
-            components=[
-                _outline_link(
-                    "Base",
-                    "/api/v1/analytics/plots/base.png",
-                    request_base=request_base,
-                    new_tab=True,
-                ),
-                _outline_link(
-                    "Hour",
-                    "/api/v1/analytics/plots/hour.png",
-                    request_base=request_base,
-                    new_tab=True,
-                ),
-                _outline_link(
-                    "Pickups by date",
-                    "/api/v1/analytics/plots/pickups-by-date.png",
                     request_base=request_base,
                     new_tab=True,
                 ),
