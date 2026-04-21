@@ -1,6 +1,8 @@
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 import app.config as app_config
 from fastapi import FastAPI
@@ -9,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.fastui_html import fruger_prebuilt_html
 from app.db.migrations import migrate_db_path, operational_tables_present
 from app.db.operational_seed import seed_default_accounts, seed_optional_admin
+from app.operational_demo_seed import seed_operational_demo_if_empty
 from app.routers.admin import router as admin_router
 from app.routers.analytics import router as analytics_router
 from app.routers.auth import router as auth_router
@@ -19,8 +22,13 @@ from app.routers.pages import router as pages_router
 from app.routers.rider_ui import router as rider_ui_router
 from app.routers.rides import router as rides_router
 from app.seed import pickup_count, pickups_schema_ok, run_seed
+from app.services.db_session import DBSession
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("/tmp/auth_debug.log"), logging.StreamHandler()],
+)
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +55,7 @@ async def lifespan(app: FastAPI):
     logger.info("SQLite database (all app data): %s", db_path.resolve())
 
     conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
         if not operational_tables_present(conn):
@@ -57,10 +66,32 @@ async def lifespan(app: FastAPI):
             )
         seed_optional_admin(conn)
         seed_default_accounts(conn)
+        seed_operational_demo_if_empty(conn)
         conn.commit()
     finally:
         conn.close()
-    yield
+    # start background scheduler to expire stale bids every minute
+    sched = AsyncIOScheduler()
+
+    def _expire():
+        db = DBSession(app_config.DB_PATH)
+        with db.connection() as conn:
+            n = db.expire_stale_bids(conn, older_than_minutes=10)
+            if n:
+                logging.getLogger(__name__).info("Expired %s stale bids", n)
+
+    sched.add_job(
+        _expire, IntervalTrigger(seconds=60), id="expire_bids", replace_existing=True
+    )
+    sched.start()
+
+    try:
+        yield
+    finally:
+        try:
+            sched.shutdown(wait=False)
+        except Exception:
+            logging.getLogger(__name__).exception("Failed to shutdown scheduler")
 
 
 app = FastAPI(title="Fruger — rides & NYC pickup analytics", lifespan=lifespan)
@@ -82,10 +113,15 @@ app.include_router(fruger_fastui_router)
 app.include_router(pages_router)
 
 
+# Scheduler is started inside the lifespan context to avoid FastAPI on_event deprecation.
+
+
 @app.get("/{path:path}")
 async def html_landing() -> HTMLResponse:
     """Serves the FastUI React bundle for client-side routes (must be registered last)."""
-    return HTMLResponse(fruger_prebuilt_html(title="Fruger — rides & NYC pickup analytics"))
+    return HTMLResponse(
+        fruger_prebuilt_html(title="Fruger — rides & NYC pickup analytics")
+    )
 
 
 if __name__ == "__main__":
