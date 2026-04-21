@@ -77,21 +77,21 @@ def plot_pickups_by_date() -> Response:
 # Backwards-friendly aliases (older relative URLs)
 @router.get("/plots/status.png")
 def plot_status_alias() -> RedirectResponse:
-    return RedirectResponse(url="/api/analytics/plots/borough.png", status_code=307)
+    return RedirectResponse(url="/api/v1/analytics/plots/borough.png", status_code=307)
 
 
 @router.get("/plots/vehicle.png")
 def plot_vehicle_alias() -> RedirectResponse:
-    return RedirectResponse(url="/api/analytics/plots/base.png", status_code=307)
+    return RedirectResponse(url="/api/v1/analytics/plots/base.png", status_code=307)
 
 
 @router.get("/plots/payment.png")
 def plot_payment_alias() -> RedirectResponse:
-    return RedirectResponse(url="/api/analytics/plots/hour.png", status_code=307)
+    return RedirectResponse(url="/api/v1/analytics/plots/hour.png", status_code=307)
 
 
 @router.get("/plots/timeline.png")
 def plot_timeline_alias() -> RedirectResponse:
     return RedirectResponse(
-        url="/api/analytics/plots/pickups-by-date.png", status_code=307
+        url="/api/v1/analytics/plots/pickups-by-date.png", status_code=307
     )

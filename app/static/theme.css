@@ -107,6 +107,53 @@ html {
   width: 100%;
 }
 
+/* Driver FastUI route: viewport column so the iframe can flex to the bottom */
+body.ds-body:has(.driver-viewport-page) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+body.ds-body:has(.driver-viewport-page) #root {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#root:has(.driver-viewport-page) > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* FastUI prebuilt may nest one more wrapper before the Page */
+#root:has(.driver-viewport-page) > * > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#root:has(.driver-viewport-page) .driver-viewport-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.driver-viewport-page > *:not([class*="flex-1"]) {
+  flex-shrink: 0;
+}
+
 /* Typography scale — editorial contrast */
 .display-lg {
   font-family: var(--font-display);
@@ -759,9 +806,129 @@ a.card-editorial:hover {
   text-decoration: underline;
 }
 
+/* Driver embed (/embed/driver) — full-width rows, table uses remaining iframe height */
+html.driver-embed,
+html.driver-embed body {
+  height: 100%;
+  margin: 0;
+}
+
+/* Ensure iframe used for the driver hub fills the viewport.
+   FastUI may not apply className directly to the <iframe>, so target
+   any iframe inside the driver page wrapper and force full-height. */
+#root:has(.driver-viewport-page) iframe {
+  height: 100vh !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  border: 0 !important;
+  display: block;
+}
+
+#root:has(.driver-viewport-page) .driver-viewport-page,
+#root:has(.driver-viewport-page) .driver-viewport-page > *,
+#root:has(.driver-viewport-page) > * {
+  height: 100vh !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+/* Minimal app bar when /embed/driver is opened directly (no FastUI shell).
+   Keep in normal flow — no negative margins (they fought driver-layout > * width: 100%). */
+.embed-navbar {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) 0;
+  background: transparent;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.embed-navbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.embed-navbar__brand {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--on-surface);
+  text-decoration: none;
+}
+
+.embed-navbar__brand:hover {
+  color: var(--secondary);
+}
+
+.embed-navbar__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.embed-navbar__link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--secondary);
+  text-decoration: none;
+}
+
+.embed-navbar__link:hover {
+  text-decoration: underline;
+}
+
+.embed-navbar__btn {
+  font-family: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* Inside /driver iframe the FastUI shell already provides the navbar. */
+html.driver-embed.driver-embed--framed .embed-navbar {
+  display: none;
+}
+
+body.tool-page.driver-layout {
+  min-height: 100dvh;
+  height: 100dvh;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-4);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom, 0));
+  align-items: stretch;
+  /* Let the iframe document own scrolling; avoid nested inner scroll areas. */
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body.tool-page.driver-layout > * {
+  max-width: none;
+  width: 100%;
+}
+
+body.tool-page.driver-layout .rides-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: auto;
+  margin-bottom: 0;
+  width: 100%;
+}
+
+body.tool-page.driver-layout .rides-table {
+  table-layout: fixed;
+}
+
 .tool-map {
   height: 420px;
   width: 100%;
+  max-width: none;
   margin: var(--space-3) 0;
   background: var(--surface-container-low);
   border-radius: var(--radius-md);
@@ -770,6 +937,57 @@ a.card-editorial:hover {
 
 .tool-map--tall {
   height: 480px;
+}
+
+/*
+ * FastUI prebuilt iframe component does not render className on <iframe>.
+ * Stretch the fleet embed via a wrapper + descendant selector.
+ */
+.admin-fleet-map-shell {
+  width: 100%;
+  max-width: none;
+  min-height: min(80vh, 920px);
+  height: min(80vh, 920px);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-fleet-map-shell iframe {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+}
+
+/*
+ * Partner map HTML document (/embed/admin/map): fill the parent <iframe> with no inner page scroll.
+ * Previously: headings + map sized in vh exceeded the iframe height → nested scrollbar obscured the map.
+ */
+html.admin-map-embed-root {
+  height: 100%;
+}
+
+body.admin-map-embed {
+  height: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body.admin-map-embed .admin-map-embed__chrome {
+  flex: 0 0 auto;
+}
+
+body.admin-map-embed #admin-map.tool-map.admin-map-embed__map {
+  flex: 1 1 auto;
+  min-height: 200px;
+  height: auto !important;
+  margin-top: var(--space-2);
+  margin-bottom: 0;
 }
 
 .tool-controls {
@@ -856,15 +1074,61 @@ a.card-editorial:hover {
   border-radius: var(--radius-md);
 }
 
+/* FastUI analytics / breakdown tables (DisplayLookup label + count) */
+.fruger-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--outline-variant);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.fruger-data-table thead th {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+  padding: 1rem 1.35rem;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  white-space: nowrap;
+}
+
+.fruger-data-table thead th:last-child {
+  text-align: right;
+}
+
+.fruger-data-table tbody td {
+  padding: 1rem 1.35rem;
+  border: 1px solid var(--outline-variant);
+  color: var(--on-surface);
+  vertical-align: middle;
+}
+
+.fruger-data-table tbody td:last-child {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-surface);
+}
+
+.fruger-data-table tbody tr:nth-child(even) td {
+  background: rgba(249, 249, 249, 0.65);
+}
+
+.fruger-data-table tbody tr:hover td {
+  background: var(--surface-container-lowest);
+}
+
 /* Rider dashboard — trips table */
 .rides-panel {
   background: var(--surface-container-low);
   border-radius: var(--radius-md);
   padding: var(--space-2);
   margin-bottom: var(--space-4);
-}
-
-.rides-panel__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -880,12 +1144,6 @@ a.card-editorial:hover {
 /* Full-width rides panel for driver page */
 .tool-page .rides-panel {
   width: 100%;
-}
-
-.tool-page .rides-panel__scroll {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .rides-table thead th {
@@ -931,6 +1189,19 @@ a.card-editorial:hover {
   font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
   font-size: 0.8125rem;
   color: var(--on-surface-variant);
+}
+
+.rides-table__place {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--on-surface);
+}
+
+.rides-table__coords {
+  font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+  font-size: 0.75rem;
 }
 
 .rides-table__time {

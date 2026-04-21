@@ -1,6 +1,5 @@
 (function () {
-  let map = null;
-  const markers = [];
+  // No map needed for the bids list view — render list-only UI.
 
   async function api(path, opts) {
     const r = await fetch(path, {
@@ -36,87 +35,16 @@
       .replace(/"/g, '&quot;');
   }
 
-  function clearMapMarkers() {
-    markers.forEach((m) => m.setMap(null));
-    markers.length = 0;
-  }
+  
 
-  async function updateMap(openRides) {
-    if (!map || !window.google || !google.maps) return;
-    clearMapMarkers();
-    const bounds = new google.maps.LatLngBounds();
-    let has = false;
-
-    for (const ride of openRides) {
-      const pickup = { lat: Number(ride.pickup_lat), lng: Number(ride.pickup_lng) };
-      const dropoff = { lat: Number(ride.dropoff_lat), lng: Number(ride.dropoff_lng) };
-
-      const pickupM = new google.maps.Marker({
-        position: pickup,
-        map,
-        label: `P${ride.id}`,
-        title: `Ride #${ride.id} pickup`,
-      });
-      markers.push(pickupM);
-      bounds.extend(pickup);
-      has = true;
-
-      const dropM = new google.maps.Marker({
-        position: dropoff,
-        map,
-        label: `D${ride.id}`,
-        title: `Ride #${ride.id} dropoff`,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: '#1a1c1c',
-          fillOpacity: 0.9,
-          strokeWeight: 1,
-          strokeColor: '#fff',
-        },
-      });
-      markers.push(dropM);
-      bounds.extend(dropoff);
-      has = true;
-
-      try {
-        const bidders = await api(`/api/v1/rides/${ride.id}/bidder-locations`);
-        bidders.forEach((b) => {
-          const pos = { lat: b.lat, lng: b.lng };
-          const m = new google.maps.Marker({
-            position: pos,
-            map,
-            title: `Driver #${b.driver_id} (bidder)`,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 7,
-              fillColor: '#0054cb',
-              fillOpacity: 0.95,
-              strokeWeight: 1,
-              strokeColor: '#fff',
-            },
-          });
-          markers.push(m);
-          bounds.extend(pos);
-          has = true;
-        });
-      } catch (_) {
-        /* ignore map pin errors */
-      }
-    }
-
-    if (has) map.fitBounds(bounds);
-  }
-
-  async function refresh() {
+  async function refresh(silent) {
     const root = document.getElementById('bids-root');
-    root.innerHTML = '<p>Loading…</p>';
+    if (!silent) root.innerHTML = '<p>Loading…</p>';
     try {
       const rides = await api('/api/v1/rides/me');
       const open = rides.filter((r) => r.status === 'bidding_open');
       if (open.length === 0) {
         root.innerHTML = '<p>No rides in <code>bidding_open</code> status.</p>';
-        clearMapMarkers();
         return;
       }
       const parts = [];
@@ -140,8 +68,15 @@
         }
         parts.push(
           `<section class="ride-card-ds"><h2>Ride #${esc(ride.id)}</h2>` +
-            `<p class="muted">Pickup: ${esc(ride.pickup_lat)}, ${esc(ride.pickup_lng)} · ` +
-            `Dropoff: ${esc(ride.dropoff_lat)}, ${esc(ride.dropoff_lng)}</p>` +
+            `<p class="muted">Pickup: ${
+              ride.pickup_location
+                ? esc(ride.pickup_location) + ' · ' + esc(ride.pickup_lat) + ', ' + esc(ride.pickup_lng)
+                : esc(ride.pickup_lat) + ', ' + esc(ride.pickup_lng)
+            } · Dropoff: ${
+              ride.dropoff_location
+                ? esc(ride.dropoff_location) + ' · ' + esc(ride.dropoff_lat) + ', ' + esc(ride.dropoff_lng)
+                : esc(ride.dropoff_lat) + ', ' + esc(ride.dropoff_lng)
+            }</p>` +
             bidHtml +
             `</section>`,
         );
@@ -154,31 +89,30 @@
           if (!confirm('Accept this bid and assign the driver?')) return;
           try {
             await api(`/api/v1/rides/${rideId}/bids/${bidId}/accept`, { method: 'POST', body: '{}' });
-            await refresh();
+            await refresh(true);
           } catch (e) {
             alert(e.message);
           }
         });
       });
-      await updateMap(open);
+      // no map to update in list-only view
     } catch (e) {
       root.innerHTML = '<p class="err">Error: ' + esc(e.message) + '</p>';
     }
   }
 
-  window.initRiderMap = function () {
-    const el = document.getElementById('rider-map');
-    if (!window.google || !google.maps) {
-      el.textContent = 'Maps failed to load.';
-      return;
-    }
-    map = new google.maps.Map(el, {
-      center: { lat: 40.7128, lng: -74.006 },
-      zoom: 11,
-    });
-    refresh();
-  };
+  // no maps init — list-only
 
-  document.getElementById('btn-refresh').addEventListener('click', refresh);
-  refresh();
+  window.addEventListener('message', function (ev) {
+    if (ev.data && ev.data.type === 'fruger-refresh-bids') refresh(true);
+  });
+
+  document.getElementById('btn-refresh').addEventListener('click', function () {
+    refresh(false);
+  });
+  refresh(false);
+
+  setInterval(function () {
+    if (document.visibilityState === 'visible') refresh(true);
+  }, 4000);
 })();

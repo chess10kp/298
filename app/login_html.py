@@ -25,15 +25,13 @@ def render_login_page(
         extra_nav = ""
         if rv == "admin":
             extra_nav = """
-          <a class="login-shortcuts__link" href="/admin/dashboard">Admin</a>
-          <a class="login-shortcuts__link" href="/admin/map">Fleet</a>"""
+          <a class="login-shortcuts__link" href="/admin/dashboard">Admin</a>"""
         elif rv == "driver":
             extra_nav = """
           <a class="login-shortcuts__link" href="/driver">Driver</a>"""
         elif rv == "rider":
             extra_nav = """
-          <a class="login-shortcuts__link" href="/">Rider hub</a>
-          <a class="login-shortcuts__link" href="/rider/bids">Bids</a>"""
+          <a class="login-shortcuts__link" href="/">Rider hub</a>"""
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -55,11 +53,6 @@ def render_login_page(
         <nav class="login-shortcuts" aria-label="Application shortcuts">
           <a class="login-shortcuts__link" href="/">Dashboard</a>{extra_nav}
         </nav>
-      </div>
-      <div class="login-redirect" role="region" aria-labelledby="login-redirect-heading">
-        <p id="login-redirect-heading" class="label-md login-redirect__label">Post-sign-in destination</p>
-        <p class="login-redirect__path" title="{nu}"><code class="login-redirect__path-code">{nu}</code></p>
-        <a href="{nu}" class="btn btn--primary login-redirect__cta">Continue to app</a>
       </div>
       <button type="button" class="btn btn--ghost" id="logout-btn">Log out</button>
     </div>
@@ -172,7 +165,8 @@ def render_login_page(
             body: JSON.stringify(body),
           }});
           if (r.ok) {{
-            window.location.href = nextUrl;
+            const data = await r.json();
+            window.location.href = data.redirect || nextUrl;
           }} else {{
             alert('Login failed');
           }}

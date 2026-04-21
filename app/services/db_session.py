@@ -338,6 +338,17 @@ class DBSession:
         cur.execute("SELECT COUNT(*) FROM rides")
         return int(cur.fetchone()[0])
 
+    def count_pickups_rows(self, conn: sqlite3.Connection) -> int:
+        """NYC TLC seed table (analytics); unrelated to Fruger ``rides``."""
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='pickups' LIMIT 1"
+        )
+        if cur.fetchone() is None:
+            return 0
+        cur.execute("SELECT COUNT(*) FROM pickups")
+        return int(cur.fetchone()[0])
+
     def count_rides_by_status(self, conn: sqlite3.Connection) -> dict[str, int]:
         cur = conn.cursor()
         cur.execute("SELECT status, COUNT(*) FROM rides GROUP BY status")

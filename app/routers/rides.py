@@ -217,7 +217,7 @@ def accept_bid(
     except Exception:
         # Intentionally swallow broadcast errors to avoid impacting API flow
         pass
-    return RideService.ride_from_row(ride_row)
+    return RideService.ride_from_row(ride_row, conn)
 
 
 @router.post("/{ride_id}/start", response_model=RideOut)

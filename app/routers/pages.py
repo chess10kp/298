@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.deps import get_current_user_optional
+from app.embed_html import driver_hub_document_html
 from app.fastui_html import fruger_prebuilt_html
 from app.login_html import render_login_page
 from app.schemas.operational import UserPublic, UserRole
@@ -38,6 +39,8 @@ def home_page(user: Annotated[UserPublic | None, Depends(get_current_user_option
         return RedirectResponse(url="/login?next=/", status_code=status.HTTP_302_FOUND)
     if user.role == UserRole.rider:
         return _shell("Rider hub — Fruger")
+    if user.role == UserRole.driver:
+        return RedirectResponse(url="/driver", status_code=status.HTTP_302_FOUND)
     return _shell("Dashboard — Fruger")
 
 
@@ -68,23 +71,43 @@ def driver_page(user: Annotated[UserPublic | None, Depends(get_current_user_opti
         return RedirectResponse(
             url="/login?next=/driver", status_code=status.HTTP_302_FOUND
         )
+    # If the user is authenticated but not a driver, send them to their
+    # appropriate home page instead of returning a 403 with a message.
     if user.role != UserRole.driver:
-        _forbidden_driver()
-    return _shell("Driver — Fruger")
+        return home_page(user)
+    return HTMLResponse(driver_hub_document_html())
+
+
+@router.get("/driver/")
+def driver_page_slash(
+    user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+):
+    return driver_page(user)
+
+
+@router.get("/drivers")
+@router.get("/drivers/")
+def drivers_page_alias() -> RedirectResponse:
+    """Alias for users who type the plural route."""
+    return RedirectResponse(url="/driver", status_code=status.HTTP_302_FOUND)
 
 
 @router.get("/admin/map")
 def admin_map_page(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ):
+    """Legacy URL; fleet map is embedded on the admin dashboard."""
     if user is None:
         return RedirectResponse(
-            url="/login?next=/admin/map",
+            url="/login?next=/admin/dashboard",
             status_code=status.HTTP_302_FOUND,
         )
     if user.role != UserRole.admin:
         _forbidden_admin()
-    return _shell("Fleet map — Fruger")
+    return RedirectResponse(
+        url="/admin/dashboard",
+        status_code=status.HTTP_302_FOUND,
+    )
 
 
 @router.get("/rider/dashboard")
@@ -120,14 +143,15 @@ def admin_dashboard_shell(
 def rider_bids_page(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
 ):
+    """Bids are on the rider hub at ``/``; keep URL for bookmarks."""
     if user is None:
         return RedirectResponse(
-            url="/login?next=/rider/bids",
+            url="/login?next=/",
             status_code=status.HTTP_302_FOUND,
         )
     if user.role != UserRole.rider:
         _forbidden_rider()
-    return _shell("Bids — Fruger")
+    return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
 
 
 def _forbidden_driver() -> None:

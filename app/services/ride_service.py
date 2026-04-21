@@ -9,6 +9,8 @@ from fastapi import HTTPException, status
 
 from app.schemas.operational import BidStatus, RideCreate, RideOut, RideStatus
 from app.services.db_session import DBSession
+from app.services.operational_pickup_events import try_record_fruger_pickup_for_ride
+from app.services.pickup_dataset_labels import attach_pickup_dataset_labels
 
 
 class RideService:
@@ -16,8 +18,8 @@ class RideService:
         self._db = db
 
     @staticmethod
-    def ride_from_row(row: dict) -> RideOut:
-        return RideOut(
+    def ride_from_row(row: dict, conn: sqlite3.Connection | None = None) -> RideOut:
+        out = RideOut(
             id=int(row["id"]),
             rider_id=int(row["rider_id"]),
             pickup_lat=float(row["pickup_lat"]),
@@ -31,6 +33,9 @@ class RideService:
             cancelled_at=str(row["cancelled_at"]) if row["cancelled_at"] is not None else None,
             completed_at=str(row["completed_at"]) if row["completed_at"] is not None else None,
         )
+        if conn is not None:
+            return attach_pickup_dataset_labels(conn, out)
+        return out
 
     def request_ride(self, conn: sqlite3.Connection, rider_id: int, body: RideCreate) -> RideOut:
         rid = self._db.insert_ride(
@@ -44,7 +49,14 @@ class RideService:
         )
         row = self._db.get_ride(conn, rid)
         assert row is not None
-        return self.ride_from_row(row)
+        try_record_fruger_pickup_for_ride(
+            conn,
+            ride_id=rid,
+            pickup_lat=body.pickup_lat,
+            pickup_lng=body.pickup_lng,
+            created_at=str(row["created_at"]),
+        )
+        return self.ride_from_row(row, conn)
 
     def cancel_ride(self, conn: sqlite3.Connection, ride_id: int, rider_id: int) -> RideOut:
         row = self._db.get_ride(conn, ride_id)
@@ -72,21 +84,21 @@ class RideService:
         )
         row2 = self._db.get_ride(conn, ride_id)
         assert row2 is not None
-        return self.ride_from_row(row2)
+        return self.ride_from_row(row2, conn)
 
     def list_my_rides(self, conn: sqlite3.Connection, rider_id: int) -> list[RideOut]:
         rows = self._db.list_rides_for_rider(conn, rider_id)
-        return [self.ride_from_row(r) for r in rows]
+        return [self.ride_from_row(r, conn) for r in rows]
 
     def list_open_rides(self, conn: sqlite3.Connection) -> list[RideOut]:
         rows = self._db.list_rides_with_status(conn, RideStatus.bidding_open)
-        return [self.ride_from_row(r) for r in rows]
+        return [self.ride_from_row(r, conn) for r in rows]
 
     def get_ride(self, conn: sqlite3.Connection, ride_id: int) -> RideOut:
         row = self._db.get_ride(conn, ride_id)
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ride not found")
-        return self.ride_from_row(row)
+        return self.ride_from_row(row, conn)
 
     def start_ride(self, conn: sqlite3.Connection, ride_id: int, driver_id: int) -> RideOut:
         ride = self._db.get_ride(conn, ride_id)
@@ -106,7 +118,7 @@ class RideService:
         self._db.update_ride(conn, ride_id, status=RideStatus.in_progress)
         row = self._db.get_ride(conn, ride_id)
         assert row is not None
-        return self.ride_from_row(row)
+        return self.ride_from_row(row, conn)
 
     def complete_ride(self, conn: sqlite3.Connection, ride_id: int, driver_id: int) -> RideOut:
         ride = self._db.get_ride(conn, ride_id)
@@ -134,4 +146,4 @@ class RideService:
         )
         row = self._db.get_ride(conn, ride_id)
         assert row is not None
-        return self.ride_from_row(row)
+        return self.ride_from_row(row, conn)

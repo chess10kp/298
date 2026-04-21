@@ -34,7 +34,9 @@
     const el = document.getElementById('fleet-out');
     try {
       const locs = await api('/api/v1/admin/driver-locations');
-      el.textContent = JSON.stringify(locs, null, 2);
+      if (el) {
+        el.textContent = JSON.stringify(locs, null, 2);
+      }
 
       if (!map || !window.google || !google.maps) return;
 
@@ -60,7 +62,9 @@
       });
       if (locs.length > 0) map.fitBounds(bounds);
     } catch (e) {
-      el.textContent = 'Could not load locations: ' + e.message;
+      if (el) {
+        el.textContent = 'Could not load locations: ' + e.message;
+      }
     }
   }
 
@@ -74,6 +78,16 @@
       center: { lat: 40.7128, lng: -74.006 },
       zoom: 11,
     });
+    function nudgeResize() {
+      try {
+        google.maps.event.trigger(map, 'resize');
+      } catch (_) {}
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => nudgeResize()).observe(el);
+    }
+    requestAnimationFrame(nudgeResize);
+    setTimeout(nudgeResize, 50);
     setInterval(refreshLocations, 10000);
     refreshLocations();
   };

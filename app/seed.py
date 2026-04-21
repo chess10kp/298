@@ -27,8 +27,12 @@ _PICKUPS_DDL = f"""CREATE TABLE {PICKUPS_TABLE} (
     zone TEXT,
     borough TEXT,
     base_code TEXT,
-    data_source TEXT
+    data_source TEXT,
+    source TEXT DEFAULT 'nyc_dataset'
 )"""
+
+# Seed rows from TLC CSVs; live ride requests append rows with source ``fruger_app``.
+NYC_DATASET_SOURCE = "nyc_dataset"
 
 
 def pickups_schema_ok(db_path: Path) -> bool:
@@ -184,6 +188,7 @@ def _normalize_2014(df: pd.DataFrame) -> pd.DataFrame:
                 "borough",
                 "base_code",
                 "data_source",
+                "source",
             ]
         )
     df = df.loc[ok].reset_index(drop=True)
@@ -200,6 +205,7 @@ def _normalize_2014(df: pd.DataFrame) -> pd.DataFrame:
             "borough": pd.NA,
             "base_code": df[base_c].astype(str),
             "data_source": "2014",
+            "source": NYC_DATASET_SOURCE,
         }
     )
 
@@ -231,6 +237,7 @@ def _normalize_2015(df: pd.DataFrame, zones: pd.DataFrame) -> pd.DataFrame:
                 "borough",
                 "base_code",
                 "data_source",
+                "source",
             ]
         )
     df = df.loc[ok].reset_index(drop=True)
@@ -250,6 +257,7 @@ def _normalize_2015(df: pd.DataFrame, zones: pd.DataFrame) -> pd.DataFrame:
             "borough": merged["borough"],
             "base_code": df[base].astype(str),
             "data_source": "2015",
+            "source": NYC_DATASET_SOURCE,
         }
     )
 

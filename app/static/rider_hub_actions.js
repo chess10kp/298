@@ -84,6 +84,9 @@
     bindSearch('dropoff_search', 'dropoff_lat', 'dropoff_lng', dropoffMarker);
   };
 
+  let bidPollTimer = null;
+  let bidPollRideId = null;
+
   async function api(path, opts) {
     const r = await fetch(path, {
       credentials: 'include',
@@ -124,6 +127,135 @@
     }
   }
 
+  function fmtFare(cents) {
+    return (Number(cents) / 100).toFixed(2);
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function notifyBidsIframeRefresh() {
+    try {
+      if (window.parent === window) return;
+      const parent = window.parent;
+      const iframes = parent.document.querySelectorAll('iframe');
+      iframes.forEach((f) => {
+        try {
+          if (f.src && f.src.indexOf('/embed/rider/bids') !== -1 && f.contentWindow) {
+            f.contentWindow.postMessage({ type: 'fruger-refresh-bids' }, '*');
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  function stopBidPolling() {
+    if (bidPollTimer) {
+      clearInterval(bidPollTimer);
+      bidPollTimer = null;
+    }
+    bidPollRideId = null;
+  }
+
+  function hideWaitingUi() {
+    const w = document.getElementById('rider-waiting-panel');
+    if (w) w.hidden = true;
+  }
+
+  function showWaitingUi(rideId) {
+    const w = document.getElementById('rider-waiting-panel');
+    const num = document.getElementById('rider-waiting-id');
+    const inline = document.getElementById('rider-inline-bids');
+    if (num) num.textContent = String(rideId);
+    if (w) {
+      w.hidden = false;
+      try {
+        w.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (_) {}
+    }
+    if (inline) inline.hidden = false;
+  }
+
+  function renderInlineBids(bids, rideId) {
+    const root = document.getElementById('rider-inline-bids-root');
+    if (!root) return;
+    if (bids.length === 0) {
+      root.innerHTML =
+        '<p class="body-sm muted" style="margin:0;">No offers yet — we’ll show each bid here as drivers respond.</p>';
+      return;
+    }
+    root.innerHTML =
+      '<ul class="bid-list-ds">' +
+      bids
+        .map(
+          (b) =>
+            `<li><strong>$${fmtFare(b.fare_cents)}</strong> — driver #${esc(b.driver_id)} · ` +
+            `${esc(b.distance_to_pickup_m)} m · ${esc(b.status)} ` +
+            `<button type="button" class="btn btn--secondary rider-inline-accept" data-ride="${rideId}" data-bid="${b.id}">Accept</button></li>`,
+        )
+        .join('') +
+      '</ul>';
+    root.querySelectorAll('.rider-inline-accept').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const rid = btn.getAttribute('data-ride');
+        const bid = btn.getAttribute('data-bid');
+        if (!confirm('Accept this bid and assign the driver?')) return;
+        const msg = document.getElementById('rider-hub-msg');
+        try {
+          await api(`/api/v1/rides/${rid}/bids/${bid}/accept`, { method: 'POST', body: '{}' });
+          stopBidPolling();
+          hideWaitingUi();
+          if (msg) setMsg(msg, `Bid accepted for ride #${rid}.`, true);
+          notifyBidsIframeRefresh();
+          reloadParent();
+        } catch (err) {
+          if (msg) setMsg(msg, String(err.message || err), false);
+        }
+      });
+    });
+  }
+
+  function startBidPolling(rideId) {
+    stopBidPolling();
+    bidPollRideId = rideId;
+    const msg = document.getElementById('rider-hub-msg');
+    const tick = async () => {
+      if (!bidPollRideId) return;
+      try {
+        const ride = await api(`/api/v1/rides/${rideId}`);
+        const bids = await api(`/api/v1/rides/${rideId}/bids`);
+        renderInlineBids(bids, rideId);
+        notifyBidsIframeRefresh();
+
+        if (ride.status !== 'bidding_open') {
+          stopBidPolling();
+          hideWaitingUi();
+          if (msg) {
+            if (ride.status === 'assigned' || ride.status === 'in_progress') {
+              setMsg(msg, `Ride #${rideId} is assigned.`, true);
+            } else if (ride.status === 'completed') {
+              setMsg(msg, `Ride #${rideId} completed.`, true);
+            } else if (ride.status === 'cancelled') {
+              setMsg(msg, `Ride #${rideId} was cancelled.`, false);
+            } else {
+              setMsg(msg, `Ride #${rideId}: ${ride.status}.`, true);
+            }
+          }
+          notifyBidsIframeRefresh();
+          return;
+        }
+      } catch (e) {
+        if (msg) setMsg(msg, String(e.message || e), false);
+      }
+    };
+    tick();
+    bidPollTimer = setInterval(tick, 2000);
+  }
+
   function parseCoordForm(fd) {
     const pickup_lat = parseFloat(String(fd.get('pickup_lat') ?? '').trim());
     const pickup_lng = parseFloat(String(fd.get('pickup_lng') ?? '').trim());
@@ -139,7 +271,7 @@
     createForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!msg) return;
-      setMsg(msg, 'Creating…', null);
+      setMsg(msg, 'Sending your request…', null);
       const fd = new FormData(createForm);
       const body = parseCoordForm(fd);
       if (
@@ -159,8 +291,13 @@
       }
       try {
         const ride = await api('/api/v1/rides', { method: 'POST', body: JSON.stringify(body) });
-        setMsg(msg, `Ride #${ride.id} created.`, true);
-        reloadParent();
+        setMsg(msg, `Ride #${ride.id} is open for bids.`, true);
+        showWaitingUi(ride.id);
+        renderInlineBids([], ride.id);
+        startBidPolling(ride.id);
+        notifyBidsIframeRefresh();
+        // Refresh the rider's rides list so the new ride appears with its cancel button
+        try { fetchAndRenderMyRides(); } catch (_) {}
       } catch (err) {
         setMsg(msg, String(err.message || err), false);
       }
@@ -180,11 +317,14 @@
       }
       setMsg(msg, 'Cancelling…', null);
       try {
+        stopBidPolling();
+        hideWaitingUi();
         const ride = await api(`/api/v1/rides/${encodeURIComponent(id)}/cancel`, {
           method: 'POST',
           body: '{}',
         });
         setMsg(msg, `Ride #${ride.id} cancelled (${ride.status}).`, true);
+        notifyBidsIframeRefresh();
         reloadParent();
       } catch (err) {
         setMsg(msg, String(err.message || err), false);
@@ -192,24 +332,79 @@
     });
   }
 
+  // Render rider's own rides and show a cancel button per row.
+  async function fetchAndRenderMyRides() {
+    const root = document.getElementById('my-rides-root');
+    if (!root) return;
+    root.innerHTML = 'Loading…';
+    try {
+      const rides = await api('/api/v1/rides/me');
+      if (!rides || rides.length === 0) {
+        root.innerHTML = '<p class="muted">No rides found.</p>';
+        return;
+      }
+      const rows = rides
+        .map((r) => {
+          const pickup = r.pickup_location
+            ? `${esc(r.pickup_location)} · ${esc(r.pickup_lat)}, ${esc(r.pickup_lng)}`
+            : `${esc(r.pickup_lat)}, ${esc(r.pickup_lng)}`;
+          const drop = r.dropoff_location
+            ? `${esc(r.dropoff_location)} · ${esc(r.dropoff_lat)}, ${esc(r.dropoff_lng)}`
+            : `${esc(r.dropoff_lat)}, ${esc(r.dropoff_lng)}`;
+          return (
+            '<tr data-ride-id="' + esc(r.id) + '">' +
+            '<td>' + esc(r.id) + '</td>' +
+            '<td>' + esc(r.status) + '</td>' +
+            '<td>' + pickup + '</td>' +
+            '<td>' + drop + '</td>' +
+            '<td><button type="button" class="btn btn--secondary rider-cancel" data-ride="' + esc(r.id) + '">Cancel</button></td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+      root.innerHTML =
+        '<table style="width:100%; border-collapse: collapse;" class="tool-table"><thead><tr><th>Ride</th><th>Status</th><th>Pickup</th><th>Dropoff</th><th></th></tr></thead><tbody>' +
+        rows +
+        '</tbody></table>';
+      root.querySelectorAll('.rider-cancel').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const rid = btn.getAttribute('data-ride');
+          if (!confirm('Cancel ride #' + rid + '?')) return;
+          try {
+            setMsg(msg, 'Cancelling…', null);
+            stopBidPolling();
+            hideWaitingUi();
+            const ride = await api(`/api/v1/rides/${encodeURIComponent(rid)}/cancel`, {
+              method: 'POST',
+              body: '{}',
+            });
+            setMsg(msg, `Ride #${ride.id} cancelled (${ride.status}).`, true);
+            notifyBidsIframeRefresh();
+            fetchAndRenderMyRides();
+            reloadParent();
+          } catch (err) {
+            setMsg(msg, String(err.message || err), false);
+          }
+        });
+      });
+    } catch (err) {
+      root.innerHTML = '<p class="err">' + esc(String(err.message || err)) + '</p>';
+    }
+  }
+
+  // Initial render of my rides and subscribe to events that should refresh.
+  fetchAndRenderMyRides();
+
   const logoutBtn = document.getElementById('rider-hub-logout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      console.log('LOGOUT BUTTON CLICKED');
       if (!msg) return;
       setMsg(msg, 'Signing out…', null);
       try {
-        console.log('FETCHING /api/v1/auth/logout with POST');
         const r = await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' });
-        console.log('RESPONSE STATUS:', r.status, r.statusText);
-        console.log('RESPONSE OK:', r.ok);
         if (!r.ok) throw new Error(r.statusText);
-        const text = await r.text();
-        console.log('RESPONSE BODY:', text);
-        console.log('REDIRECTING TO /login');
         window.top.location.href = '/login';
       } catch (err) {
-        console.error('LOGOUT ERROR:', err);
         setMsg(msg, String(err.message || err), false);
       }
     });

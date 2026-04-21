@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 
 def _get_user_version(conn: sqlite3.Connection) -> int:
@@ -27,6 +27,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         _migrate_1_operational(conn)
         _set_user_version(conn, 1)
         v = 1
+    if v < 2:
+        _migrate_2_pickups_source(conn)
+        _set_user_version(conn, 2)
+        v = 2
     if v != CURRENT_SCHEMA_VERSION:
         logger.warning(
             "Schema version %s is behind code version %s; migrations may need updating.",
@@ -112,3 +116,19 @@ def _migrate_1_operational(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_rides_created ON rides(created_at);
         """
     )
+
+
+def _migrate_2_pickups_source(conn: sqlite3.Connection) -> None:
+    """Tag TLC seed rows vs Fruger app pickup events (``pickups.source``)."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='pickups' LIMIT 1"
+    )
+    if cur.fetchone() is None:
+        return
+    cur.execute("PRAGMA table_info(pickups)")
+    cols = {row[1] for row in cur.fetchall()}
+    if "source" not in cols:
+        conn.execute(
+            "ALTER TABLE pickups ADD COLUMN source TEXT DEFAULT 'nyc_dataset'"
+        )

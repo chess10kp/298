@@ -20,6 +20,7 @@ class AdminService:
             rides_by_status=by_status,
             completed_revenue_cents=self._db.sum_completed_revenue_cents(conn),
             total_bids=self._db.count_bids_total(conn),
+            nyc_pickup_records=self._db.count_pickups_rows(conn),
         )
 
     def revenue_by_day(self, conn: sqlite3.Connection, days: int = 14) -> list[tuple[str, int]]:

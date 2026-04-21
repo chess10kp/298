@@ -5,15 +5,14 @@ from __future__ import annotations
 from typing import Annotated
 
 import app.config as app_config
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
 
 from app.deps import get_current_user_optional
 from app.embed_html import (
     admin_map_embed,
     admin_map_embed_no_key,
-    driver_embed,
-    driver_embed_no_key,
+    driver_hub_document_html,
     rider_hub_actions_embed,
     rider_hub_actions_embed_no_key,
     rider_bids_embed,
@@ -41,9 +40,7 @@ def embed_driver(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Driver map is only for driver accounts.",
         )
-    key = _maps_key()
-    body = driver_embed(key) if key else driver_embed_no_key()
-    return HTMLResponse(body)
+    return HTMLResponse(driver_hub_document_html())
 
 
 @router.get("/embed/admin/map", response_class=HTMLResponse)
@@ -67,6 +64,15 @@ def embed_admin_map(
 @router.get("/embed/rider/actions", response_class=HTMLResponse)
 def embed_rider_actions(
     user: Annotated[UserPublic | None, Depends(get_current_user_optional)],
+    coords: Annotated[
+        bool,
+        Query(
+            description=(
+                "If true, use latitude/longitude fields instead of Places search "
+                "(useful when Maps Places Autocomplete is unavailable for your API key)."
+            ),
+        ),
+    ] = False,
 ) -> HTMLResponse:
     if user is None:
         raise HTTPException(
@@ -77,8 +83,11 @@ def embed_rider_actions(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This view is for rider accounts.",
         )
-    key = _maps_key()
-    body = rider_hub_actions_embed(key) if key else rider_hub_actions_embed_no_key()
+    if coords:
+        body = rider_hub_actions_embed_no_key()
+    else:
+        key = _maps_key()
+        body = rider_hub_actions_embed(key) if key else rider_hub_actions_embed_no_key()
     return HTMLResponse(body)
 
 

@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
 from fastui import AnyComponent
 from pydantic import BaseModel
 
+import app.config as app_config
 from app.admin_dashboard import build_admin_dashboard
+from app.analytics_queries import fetch_overview
 from app.admin_plots import revenue_by_day_png
 from app.deps import AdminUser, Conn, get_db_session
-from app.schemas.operational import AdminStatsOut, DriverLocationOut
+from app.schemas.operational import AdminStatsOut, DriverLocationOut, UserPublic
 from app.services.admin_service import AdminService
 from app.services.db_session import DBSession
 
@@ -80,7 +82,40 @@ def revenue_plot(conn: Conn, _: AdminUser, svc: Asvc) -> Response:
     return Response(content=png, media_type="image/png")
 
 
-@router.get("/dashboard")
-def admin_dashboard_ui(conn: Conn, user: AdminUser, svc: Asvc) -> JSONResponse:
+def admin_dashboard_fastui_json(
+    conn: Conn,
+    user: UserPublic,
+    svc: AdminService,
+    request: Request | None = None,
+) -> JSONResponse:
+    """Shared FastUI tree for admin console (also served at ``/api/admin/dashboard``)."""
     stats = svc.overview_stats(conn)
-    return _fastui_json(build_admin_dashboard(stats, user))
+    nyc_overview = None
+    nyc_err = None
+    if app_config.DB_PATH.is_file():
+        try:
+            nyc_overview = fetch_overview(app_config.DB_PATH)
+        except Exception as e:
+            nyc_err = str(e)
+    else:
+        nyc_err = "Database file not found. Start the app once to create the SQLite file."
+    base = str(request.base_url).rstrip("/") if request is not None else None
+    return _fastui_json(
+        build_admin_dashboard(
+            stats,
+            user,
+            nyc_overview=nyc_overview,
+            nyc_error=nyc_err,
+            request_base=base,
+        )
+    )
+
+
+@router.get("/dashboard")
+def admin_dashboard_ui(
+    request: Request,
+    conn: Conn,
+    user: AdminUser,
+    svc: Asvc,
+) -> JSONResponse:
+    return admin_dashboard_fastui_json(conn, user, svc, request)

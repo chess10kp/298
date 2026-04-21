@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -82,7 +82,7 @@ def create_session(
     conn: Conn,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     db: Annotated[DBSession, Depends(get_db_session)],
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     """JSON login that sets ``access_token`` httpOnly cookie for browser flows."""
     import app.config as app_config
 
@@ -107,8 +107,14 @@ def create_session(
         samesite="lax",
         path="/",
     )
-    logger.info(f"SESSION LOGIN SUCCESS: user_id={row['id']}, email={body.email}")
-    return {"ok": True}
+    user_role = str(row["role"])
+    logger.info(f"SESSION LOGIN SUCCESS: user_id={row['id']}, email={body.email}, role={user_role}")
+    
+    redirect_url = None
+    if user_role == "admin":
+        redirect_url = "/admin/dashboard"
+    
+    return {"ok": True, "redirect": redirect_url}
 
 
 @router.post("/logout")
@@ -133,7 +139,9 @@ def logout_get(request: Request, response: Response) -> JSONResponse:
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("access_token")
     logger.info("DELETED access_token WITH ALL POSSIBLE PARAMETER COMBINATIONS")
-    fire_event = c.FireEvent(event=GoToEvent(url="/login"))
+    base = str(request.base_url).rstrip("/")
+    login_abs = f"{base}/login"
+    fire_event = c.FireEvent(event=GoToEvent(url=login_abs))
     resp = JSONResponse([fire_event.model_dump(exclude_none=True, by_alias=True)])
     for key, value in response.headers.items():
         if key.lower() == "set-cookie":

@@ -1,5 +1,5 @@
 (function () {
-  console.log('[Driver] Loading driver.js v2');
+  console.log('[Driver] Loading driver.js v5');
   let watchPosId = null;
 
   async function api(path, opts) {
@@ -45,6 +45,21 @@
     }
   }
 
+  function locCell(lat, lng, label) {
+    const coords =
+      esc(Number(lat).toFixed(5)) + ', ' + esc(Number(lng).toFixed(5));
+    if (label) {
+      return (
+        '<span class="rides-table__place">' +
+        esc(label) +
+        '</span><br><span class="muted rides-table__coords">' +
+        coords +
+        '</span>'
+      );
+    }
+    return '<span class="rides-table__mono">' + coords + '</span>';
+  }
+
   async function placeBid(rideId, fareInput) {
     const fareUsd = fareInput.value.trim();
     if (!fareUsd) return alert('Enter a fare amount first.');
@@ -69,15 +84,11 @@
         '<td class="rides-table__id"><span class="rides-table__id-inner">' +
         esc(ride.id) +
         '</span></td>' +
-        '<td class="rides-table__mono">' +
-        esc(ride.pickup_lat.toFixed(5)) +
-        ', ' +
-        esc(ride.pickup_lng.toFixed(5)) +
+        '<td>' +
+        locCell(ride.pickup_lat, ride.pickup_lng, ride.pickup_location) +
         '</td>' +
-        '<td class="rides-table__mono">' +
-        esc(ride.dropoff_lat.toFixed(5)) +
-        ', ' +
-        esc(ride.dropoff_lng.toFixed(5)) +
+        '<td>' +
+        locCell(ride.dropoff_lat, ride.dropoff_lng, ride.dropoff_location) +
         '</td>' +
         '<td class="rides-table__time rides-table__mono">' +
         esc(fmtTime(ride.created_at)) +
@@ -164,6 +175,26 @@
     const startBtn = document.getElementById('btn-start');
     if (!startBtn || startBtn.dataset.wired === '1') return;
     startBtn.dataset.wired = '1';
+
+    const seedBtn = document.getElementById('btn-seed-demo');
+    if (seedBtn) {
+      seedBtn.onclick = async function () {
+        try {
+          const out = await api('/api/v1/driver/seed-demo', {
+            method: 'POST',
+            body: '{}',
+          });
+          alert(
+            (out && out.message ? out.message : 'Done') +
+              '\nNew ride IDs: ' +
+              (out && out.ride_ids ? out.ride_ids.join(', ') : ''),
+          );
+          await refreshRides();
+        } catch (e) {
+          alert(e.message);
+        }
+      };
+    }
 
     startBtn.onclick = async function () {
       const id = document.getElementById('ride-id').value;

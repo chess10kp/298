@@ -6,15 +6,17 @@ from fastui.components.display import DisplayLookup
 from fastui.events import GoToEvent
 
 from app.analytics_queries import fetch_overview
-from app.components import build_footer, build_navbar
+from app.components import build_chart_gallery, build_footer, build_navbar
 from app.config import DB_PATH
 from app.fruger_tailwind import (
     BODY,
+    BREAKDOWN_HEADING,
+    DATA_TABLE,
     H1,
     H2,
-    IMG,
     OUTLINE_BTN,
     PAGE,
+    TABLE_SECTION_TITLE,
     TABLE_WRAP,
     WARN_SOFT,
 )
@@ -66,21 +68,24 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
         slice_ = rows[:max_rows]
         if not slice_:
             return [
-                c.Heading(text=title, level=2, class_name=H2),
-                c.Paragraph(text="No rows.", class_name="text-fruger-muted"),
+                c.Heading(text=title, level=2, class_name=TABLE_SECTION_TITLE),
+                c.Paragraph(
+                    text="No rows.",
+                    class_name="text-fruger-muted mb-8 pl-1",
+                ),
             ]
         return [
-            c.Heading(text=title, level=2, class_name=H2),
+            c.Heading(text=title, level=2, class_name=TABLE_SECTION_TITLE),
             c.Div(
-                class_name=TABLE_WRAP,
+                class_name=TABLE_WRAP + " mb-10",
                 components=[
                     c.Table(
                         data=slice_,
                         columns=[
-                            DisplayLookup(field="label"),
-                            DisplayLookup(field="count"),
+                            DisplayLookup(field="label", title="Category"),
+                            DisplayLookup(field="count", title="Pickups"),
                         ],
-                        class_name="w-full text-sm",
+                        class_name=DATA_TABLE,
                     ),
                 ],
             ),
@@ -90,8 +95,10 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
         c.Heading(text="Fruger · NYC Uber pickup analytics", level=1, class_name=H1),
         build_navbar(user),
         c.Paragraph(
-            text="Source: FiveThirtyEight — Uber pickups in New York City "
-            "(TLC pickup events; not full trips — no fare, distance, or drop-offs).",
+            text=(
+                "FiveThirtyEight TLC pickup seed data plus live Fruger ride requests "
+                "(not full trips — CSV feeds have no fare, distance, or drop-offs)."
+            ),
             class_name=BODY,
         ),
         c.Div(
@@ -102,18 +109,35 @@ def build_dashboard(user: UserPublic | None = None) -> list[AnyComponent]:
             ],
         ),
         c.Heading(text="Charts", level=2, class_name=H2),
-        c.Image(
-            src="/api/analytics/plots/borough.png", alt="By borough", class_name=IMG
-        ),
-        c.Image(src="/api/analytics/plots/base.png", alt="By TLC base", class_name=IMG),
-        c.Image(src="/api/analytics/plots/hour.png", alt="By hour", class_name=IMG),
-        c.Image(
-            src="/api/analytics/plots/pickups-by-date.png",
-            alt="By date",
-            class_name=IMG,
+        build_chart_gallery(
+            [
+                (
+                    "/api/v1/analytics/plots/borough.png",
+                    "Pickups by NYC borough",
+                    "Borough distribution",
+                ),
+                (
+                    "/api/v1/analytics/plots/base.png",
+                    "Pickups by TLC base code",
+                    "Dispatching base codes",
+                ),
+                (
+                    "/api/v1/analytics/plots/hour.png",
+                    "Pickups by hour of day",
+                    "Demand through the day",
+                ),
+                (
+                    "/api/v1/analytics/plots/pickups-by-date.png",
+                    "Pickups by date",
+                    "Timeline (sample of dates)",
+                ),
+            ]
         ),
     ]
 
+    components.append(
+        c.Heading(text="Breakdowns", level=2, class_name=BREAKDOWN_HEADING),
+    )
     components.extend(_table("Pickups by TLC base", overview.by_base))
     components.extend(_table("Pickups by hour", overview.by_hour))
     components.extend(_table("Top TLC zones", overview.top_zones))

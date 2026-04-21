@@ -1,7 +1,7 @@
-"""API models for FiveThirtyEight NYC Uber **pickup** data (TLC-style feeds).
+"""API models for NYC **pickup** analytics (TLC CSV seed + Fruger ride requests).
 
-This dataset has **pickup time/place** (2014: lat/lon; 2015: TLC zone IDs + lookup).
-There are no fares, trip distance, booking status, or drop-off locations in these files.
+Seed data comes from FiveThirtyEight feeds (pickup time/place only). Riders append rows
+when they request rides (``source=fruger_app``). Charts aggregate both.
 """
 
 from pydantic import BaseModel, Field

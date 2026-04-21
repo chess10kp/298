@@ -61,6 +61,8 @@ class RideOut(BaseModel):
     pickup_lng: float
     dropoff_lat: float
     dropoff_lng: float
+    pickup_location: str | None = None
+    dropoff_location: str | None = None
     status: RideStatus
     accepted_bid_id: int | None
     final_fare_cents: int | None
@@ -93,6 +95,10 @@ class AdminStatsOut(BaseModel):
     rides_by_status: dict[str, int]
     completed_revenue_cents: int
     total_bids: int
+    nyc_pickup_records: int = Field(
+        0,
+        description="Rows in the TLC/NYC ``pickups`` seed table (analytics only; not Fruger trips).",
+    )
 
 
 class DriverLocationOut(BaseModel):

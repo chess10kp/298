@@ -12,22 +12,23 @@ from fastui.events import GoToEvent
 from app.components import build_footer, build_navbar
 from app.fruger_tailwind import (
     BODY,
-    CARD,
+    DATA_TABLE,
     EMPTY_STATE,
     H1,
-    H2,
     HERO,
-    IFRAME,
-    IFRAME_ACTIONS,
+    IFRAME_RIDER,
     LINK,
     PAGE,
+    RIDER_MAIN,
+    RIDER_PANEL,
+    RIDER_PANEL_DESC,
+    RIDER_IFRAME_WRAP,
+    RIDER_PANEL_HEAD,
+    RIDER_PANEL_TITLE,
+    RIDER_SECTION_TITLE,
     TABLE_WRAP,
 )
 from app.schemas.operational import RideOut, UserPublic, UserRole
-
-_CARD_TITLE = "font-display text-lg font-bold text-fruger-on"
-_CARD_BLURB = "text-sm text-fruger-muted mt-1"
-_CARD_CTA = "text-xs font-bold uppercase tracking-wide text-fruger-accent mt-3"
 
 
 def _nav_link(text: str, url: str) -> AnyComponent:
@@ -38,14 +39,36 @@ def _nav_link(text: str, url: str) -> AnyComponent:
     )
 
 
-def _quick_card(title: str, description: str, url: str) -> AnyComponent:
-    return c.Link(
-        class_name=CARD,
-        on_click=GoToEvent(url=url),
+def _rider_embed_panel(
+    title: str,
+    description: str,
+    *,
+    src: str,
+    iframe_title: str,
+    height: int,
+    iframe_class: str,
+) -> AnyComponent:
+    return c.Div(
+        class_name=RIDER_PANEL,
         components=[
-            c.Heading(text=title, level=3, class_name=_CARD_TITLE),
-            c.Paragraph(text=description, class_name=_CARD_BLURB),
-            c.Paragraph(text="Open →", class_name=_CARD_CTA),
+            c.Div(
+                class_name=RIDER_PANEL_HEAD,
+                components=[
+                    c.Heading(text=title, level=3, class_name=RIDER_PANEL_TITLE),
+                    c.Paragraph(text=description, class_name=RIDER_PANEL_DESC),
+                ],
+            ),
+            c.Div(
+                class_name=RIDER_IFRAME_WRAP,
+                components=[
+                    c.Iframe(
+                        src=src,
+                        title=iframe_title,
+                        height=height,
+                        class_name=iframe_class,
+                    ),
+                ],
+            ),
         ],
     )
 
@@ -70,7 +93,7 @@ def build_rider_dashboard(
                     ),
                     _nav_link("Go to login", "/login?next=/"),
                     c.Div(
-                        class_name="flex flex-wrap items-center gap-1 text-fruger-muted",
+                        class_name="flex flex-wrap items-center gap-1 text-fruger-muted text-sm",
                         components=[
                             c.Text(text="Drivers use the driver map:"),
                             _nav_link("Driver map", "/driver"),
@@ -89,8 +112,8 @@ def build_rider_dashboard(
                     build_navbar(user),
                     c.Heading(text="Fruger", level=1, class_name=H1),
                     c.Paragraph(
-                        text=f"Logged in as {user.email} ({user.role.value}). "
-                        "Register a rider account or open the correct dashboard.",
+                        text=f"Signed in as {user.email} ({user.role.value}). "
+                        "Use a rider account or open the dashboard for your role.",
                         class_name=BODY,
                     ),
                     _nav_link("Admin dashboard", "/admin/dashboard"),
@@ -98,11 +121,15 @@ def build_rider_dashboard(
             )
         ]
 
+    base = request_base or "/"
+    bids_src = urljoin(base, "/embed/rider/bids")
+    actions_src = urljoin(base, "/embed/rider/actions")
+
     ride_rows = rides[:50]
-    table: list[AnyComponent] = []
+    rides_block: list[AnyComponent]
     if ride_rows:
-        table = [
-            c.Heading(text="Your rides", level=2, class_name=H2),
+        rides_block = [
+            c.Heading(text="Your rides", level=2, class_name=RIDER_SECTION_TITLE),
             c.Div(
                 class_name=TABLE_WRAP,
                 components=[
@@ -110,21 +137,21 @@ def build_rider_dashboard(
                         data=list(ride_rows),
                         data_model=RideOut,
                         columns=[
-                            DisplayLookup(field="id"),
-                            DisplayLookup(field="status"),
-                            DisplayLookup(field="final_fare_cents"),
-                            DisplayLookup(field="created_at"),
+                            DisplayLookup(field="id", title="Ride"),
+                            DisplayLookup(field="status", title="Status"),
+                            DisplayLookup(field="final_fare_cents", title="Fare (¢)"),
+                            DisplayLookup(field="created_at", title="Requested"),
                         ],
-                        class_name="w-full text-sm",
+                        class_name=DATA_TABLE,
                     ),
                 ],
             ),
         ]
     else:
-        table = [
-            c.Heading(text="Your rides", level=2, class_name=H2),
+        rides_block = [
+            c.Heading(text="Your rides", level=2, class_name=RIDER_SECTION_TITLE),
             c.Paragraph(
-                text="No rides yet. Use the request form to create one.",
+                text="No rides yet. Request one using the form below.",
                 class_name=EMPTY_STATE,
             ),
         ]
@@ -145,76 +172,52 @@ def build_rider_dashboard(
                         c.Heading(
                             text="Welcome back",
                             level=1,
-                            class_name="font-display text-3xl font-extrabold tracking-tight mt-2",
+                            class_name="font-display text-2xl sm:text-3xl font-extrabold tracking-tight mt-2",
                         ),
                         c.Paragraph(
-                            text=(
-                                f"Signed in as {user.email}. Request rides below, "
-                                "review bids, and track trips in one place."
-                            ),
-                            class_name="text-white/85 mt-3 max-w-xl",
+                            text=user.email,
+                            class_name="text-sm text-white/70 mt-2",
+                        ),
+                        c.Paragraph(
+                            text="Your trips are listed first. Request a ride or review bids in the sections below.",
+                            class_name="text-white/85 mt-3 text-sm sm:text-base leading-relaxed",
                         ),
                     ],
                 ),
-                c.Heading(text="Quick access", level=2, class_name=H2),
                 c.Div(
-                    class_name="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start w-full",
+                    class_name=RIDER_MAIN,
                     components=[
-                        c.Div(
-                            class_name="space-y-2 min-w-0",
-                            components=[
-                                c.Paragraph(
-                                    text="Bids",
-                                    class_name="text-xs font-semibold uppercase tracking-widest text-fruger-muted",
-                                ),
-                                c.Heading(
-                                    text="Bids on your rides", level=2, class_name=H2
-                                ),
-                                c.Paragraph(
-                                    text=(
-                                        "Open rides only. Accepting assigns the driver and closes competing bids."
-                                    ),
-                                    class_name=BODY,
-                                ),
-                                c.Iframe(
-                                    src=urljoin(
-                                        request_base or "/", "/embed/rider/bids"
-                                    ),
-                                    title="Rider bids",
-                                    height=640,
-                                    class_name=IFRAME,
-                                ),
-                            ],
+                        *rides_block,
+                        c.Heading(
+                            text="What you can do",
+                            level=2,
+                            class_name=RIDER_SECTION_TITLE,
                         ),
                         c.Div(
-                            class_name="space-y-2 min-w-0",
+                            class_name=(
+                                "grid grid-cols-1 gap-6"
+                            ),
                             components=[
-                                c.Paragraph(
-                                    text="Request & manage rides",
-                                    class_name="text-xs font-semibold uppercase tracking-widest text-fruger-muted",
+                                _rider_embed_panel(
+                                    "Bids on your rides",
+                                    "Open rides only. Accepting a bid assigns the driver and closes the rest.",
+                                    src=bids_src,
+                                    iframe_title="Rider bids",
+                                    height=600,
+                                    iframe_class=f"{IFRAME_RIDER} min-h-[360px] lg:min-h-[520px]",
                                 ),
-                                c.Heading(
-                                    text="New ride & cancellation",
-                                    level=2,
-                                    class_name=H2,
-                                ),
-                                c.Paragraph(
-                                    text="Use the embedded form: search pickup and drop-off, request a ride, or cancel by ID.",
-                                    class_name="text-sm text-fruger-muted",
-                                ),
-                                c.Iframe(
-                                    src=urljoin(
-                                        request_base or "/", "/embed/rider/actions"
-                                    ),
-                                    title="Rider ride actions",
-                                    height=520,
-                                    class_name=IFRAME_ACTIONS,
+                                _rider_embed_panel(
+                                    "Request or cancel",
+                                    "Search pickup and drop-off, place a request, or cancel by ride ID.",
+                                    src=actions_src,
+                                    iframe_title="Rider ride actions",
+                                    height=480,
+                                    iframe_class=f"{IFRAME_RIDER} min-h-[320px] lg:min-h-[440px]",
                                 ),
                             ],
                         ),
                     ],
                 ),
-                *table,
                 build_footer(),
             ],
         )

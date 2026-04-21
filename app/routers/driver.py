@@ -4,13 +4,32 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+import app.config as app_config
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.deps import Conn, DriverUser, get_db_session
+from app.demo_driver_seed import run_driver_demo_seed
+from app.deps import Conn, DriverUser, get_auth_service, get_db_session
 from app.schemas.operational import DriverLocationIn
+from app.services.auth_service import AuthService
 from app.services.db_session import DBSession
 
 router = APIRouter(prefix="/api/v1/driver", tags=["driver"])
+
+
+@router.post("/seed-demo")
+def seed_demo_rides(
+    conn: Conn,
+    driver: DriverUser,
+    db: Annotated[DBSession, Depends(get_db_session)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> dict:
+    """For QA: insert demo riders (if missing), ``bidding_open`` rides, and driver GPS for bidding."""
+    if not app_config.DRIVER_DEMO_SEED:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Demo seed is disabled",
+        )
+    return run_driver_demo_seed(conn, db, auth, driver_id=driver.id)
 
 
 @router.post("/location")

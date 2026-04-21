@@ -79,5 +79,14 @@ SHOW_DEFAULT_ACCOUNT_HINTS = os.getenv("SHOW_DEFAULT_ACCOUNT_HINTS", "true").low
     "yes",
 )
 
+# Driver embed: POST /api/v1/driver/seed-demo (demo users + open rides). Disable in production.
+DRIVER_DEMO_SEED = os.getenv("DRIVER_DEMO_SEED", "true").lower() in ("1", "true", "yes")
+
 # Tests / minimal environments: skip FiveThirtyEight pickup CSV seed (operational tables still migrate)
 SKIP_DATASET_SEED = os.getenv("SKIP_DATASET_SEED", "").lower() in ("1", "true", "yes")
+
+# If the rides table is empty after migrations, seed demo users, driver GPS, bids, and rides.
+# Pytest forces this off via tests/conftest.py; set false in production if undesired.
+AUTO_OPERATIONAL_DEMO_SEED = os.getenv(
+    "AUTO_OPERATIONAL_DEMO_SEED", "true"
+).lower() in ("1", "true", "yes")
