@@ -14,13 +14,6 @@ _ADMIN_MAP_JS = "/static/admin_map.js?v=3"
 # Shared footer for standalone embed pages (Terms / Privacy / Contact). Links use target="_top".
 _EMBED_FOOTER_HTML = (
     '\n  <footer class="embed-footer embed-site-footer">'
-    '<div class="embed-site-footer__links">'
-    '<a href="/terms" target="_top">Terms</a>'
-    '<span class="embed-site-footer__sep" aria-hidden="true">·</span>'
-    '<a href="/privacy" target="_top">Privacy</a>'
-    '<span class="embed-site-footer__sep" aria-hidden="true">·</span>'
-    '<a href="/contact" target="_top">Contact</a>'
-    "</div>"
     f'<p class="embed-site-footer__copy">© Fruger {datetime.utcnow().year}</p>'
     "</footer>\n"
 )
@@ -141,7 +134,6 @@ def driver_embed(maps_key: str) -> str:
 {_EMBED_DRIVER_NAV_HTML}
   <p class="label-md" style="margin: 0 0 var(--space-2);">Partner</p>
   <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver hub</h1>
-  <p class="muted">Session-backed location updates. Browse available rides and place bids.</p>
 
   <div class="tool-controls" style="margin-bottom: var(--space-3);">
     <label>Ride ID <input id="ride-id" type="number" min="1" style="width:6rem"></label>
@@ -159,7 +151,7 @@ def driver_embed(maps_key: str) -> str:
   <div class="rides-panel">
     <div id="rides-out">Loading…</div>
   </div>
-  <script src="/static/driver.js?v=7"></script>
+  <script src="/static/driver.js?v=9"></script>
   <script async defer src="{src}"></script>
   {_EMBED_FOOTER_HTML}
 </body>
@@ -183,7 +175,6 @@ def driver_embed_no_key() -> str:
         + """
   <p class="label-md" style="margin: 0 0 var(--space-2);">Partner</p>
   <h1 class="headline-md" style="font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em;">Driver hub</h1>
-  <p class="muted">Session-backed location updates. Browse available rides and place bids.</p>
 
   <div class="tool-controls" style="margin-bottom: var(--space-3);">
     <label>Ride ID <input id="ride-id" type="number" min="1" style="width:6rem"></label>
@@ -201,7 +192,7 @@ def driver_embed_no_key() -> str:
   <div class="rides-panel">
     <div id="rides-out">Loading…</div>
   </div>
-  <script src="/static/driver.js?v=7"></script>
+  <script src="/static/driver.js?v=9"></script>
   <script>window.initDriverMap = function () {{ console.warn('No maps key'); }};</script>
 """
         + _EMBED_FOOTER_HTML
@@ -362,7 +353,7 @@ def rider_hub_actions_embed(maps_key: str) -> str:
   </section>
 </main>
 
-  <script src="/static/rider_hub_actions.js?v=3"></script>
+  <script src="/static/rider_hub_actions.js?v=4"></script>
   <script async defer src="{src}"></script>
   {_EMBED_FOOTER_HTML}
 </body>
@@ -477,7 +468,7 @@ def rider_hub_actions_embed_no_key() -> str:
   </section>
 </main>
 
-  <script src="/static/rider_hub_actions.js?v=3"></script>
+  <script src="/static/rider_hub_actions.js?v=4"></script>
 """
         + _EMBED_FOOTER_HTML
         + """

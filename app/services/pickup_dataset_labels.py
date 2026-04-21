@@ -5,20 +5,30 @@ from __future__ import annotations
 import sqlite3
 
 from app.schemas.operational import RideOut
+from app.services.reverse_geocode import nominatim_cached_label
 
 _PICKUPS = "pickups"
 # TLC CSV seed rows (``fruger_app`` rows are synthetic and must not anchor lookups).
 _SEED_FILTER = " AND (source IS NULL OR source = 'nyc_dataset') "
 
+_seed_filter_cache: dict[str, str] = {}
+
 
 def _seed_filter_sql(conn: sqlite3.Connection) -> str:
+    db_path = conn.execute("PRAGMA database_list").fetchone()[2] or ""
+    cached = _seed_filter_cache.get(db_path)
+    if cached is not None:
+        return cached
     try:
         cur = conn.cursor()
         cur.execute("PRAGMA table_info(pickups)")
         if "source" not in {r[1] for r in cur.fetchall()}:
+            _seed_filter_cache[db_path] = ""
             return ""
     except sqlite3.Error:
+        _seed_filter_cache[db_path] = ""
         return ""
+    _seed_filter_cache[db_path] = _SEED_FILTER
     return _SEED_FILTER
 
 
@@ -41,8 +51,6 @@ def _format_row_label(zone: object, borough: object, base_code: object) -> str |
         return z
     if b:
         return b
-    if bc:
-        return f"TLC base {bc}"
     return None
 
 
@@ -117,7 +125,20 @@ def nearest_seed_pickup_enrichment(
     return None
 
 
+def _resolve_label(conn: sqlite3.Connection, lat: float, lng: float) -> str | None:
+    """Try the pickups dataset first, then check the Nominatim cache.
+
+    Does NOT make a network call — the client-side ``enrichRidePlaceLabels``
+    triggers ``/api/v1/geocode/reverse-batch`` which populates the cache for
+    subsequent requests.
+    """
+    label = nearest_pickup_location_label(conn, lat, lng)
+    if label is not None:
+        return label
+    return nominatim_cached_label(lat, lng)
+
+
 def attach_pickup_dataset_labels(conn: sqlite3.Connection, ride: RideOut) -> RideOut:
-    pl = nearest_pickup_location_label(conn, ride.pickup_lat, ride.pickup_lng)
-    dl = nearest_pickup_location_label(conn, ride.dropoff_lat, ride.dropoff_lng)
+    pl = _resolve_label(conn, ride.pickup_lat, ride.pickup_lng)
+    dl = _resolve_label(conn, ride.dropoff_lat, ride.dropoff_lng)
     return ride.model_copy(update={"pickup_location": pl, "dropoff_location": dl})

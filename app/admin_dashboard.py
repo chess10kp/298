@@ -33,6 +33,7 @@ _ADMIN_FLEET_SHELL = (
     "border border-fruger-container bg-fruger-surface"
 )
 from app.schemas.analytics import NycOverviewResponse
+from app.schemas.admin_metrics import AdminMetricsOut, LabeledCount
 from app.schemas.operational import AdminStatsOut, RideStatus, UserPublic
 
 _MUTED = "text-xs font-medium uppercase tracking-wide text-fruger-muted"
@@ -45,6 +46,44 @@ _CARD_BLURB = "text-sm text-fruger-muted mt-1"
 class _RidesByStatusRow(BaseModel):
     status: str
     count: int
+
+
+class _LabelMetricRow(BaseModel):
+    label: str
+    count: int
+
+
+def _as_rows(items: list[LabeledCount]) -> list[_LabelMetricRow]:
+    return [_LabelMetricRow(label=i.label, count=i.count) for i in items]
+
+
+def _metric_table(title: str, items: list[LabeledCount], *, max_rows: int = 12) -> list[AnyComponent]:
+    rows = _as_rows(items[:max_rows])
+    if not rows:
+        return [
+            c.Heading(text=title, level=2, class_name=TABLE_SECTION_TITLE),
+            c.Div(
+                class_name=EMPTY_STATE + " mb-6",
+                components=[c.Paragraph(text="No rows yet.", class_name=BODY)],
+            ),
+        ]
+    return [
+        c.Heading(text=title, level=2, class_name=TABLE_SECTION_TITLE),
+        c.Div(
+            class_name=TABLE_WRAP + " mb-8",
+            components=[
+                c.Table(
+                    data=rows,
+                    data_model=_LabelMetricRow,
+                    columns=[
+                        DisplayLookup(field="label", title="Category"),
+                        DisplayLookup(field="count", title="Count"),
+                    ],
+                    class_name=DATA_TABLE,
+                )
+            ],
+        ),
+    ]
 
 
 def _nav_link(text: str, url: str) -> AnyComponent:
@@ -71,6 +110,7 @@ def _stat_tile(*, label: str, value: str, hint: str | None = None) -> AnyCompone
 
 def build_admin_dashboard(
     stats: AdminStatsOut,
+    metrics: AdminMetricsOut,
     user: UserPublic | None = None,
     *,
     nyc_overview: NycOverviewResponse | None = None,
@@ -135,6 +175,12 @@ def build_admin_dashboard(
             )
         )
 
+    funnel = metrics.funnel
+    bid_market = metrics.bid_market
+    revenue_metrics = metrics.revenue_fares
+    driver_snapshot = metrics.driver_snapshot
+    demand = metrics.demand
+
     components: list[AnyComponent] = [
         build_navbar(user),
         c.Heading(text="Fruger admin", level=1, class_name=H1),
@@ -194,7 +240,130 @@ def build_admin_dashboard(
                 ),
             ],
         ),
+        c.Heading(text="Marketplace funnel", level=2, class_name=H2),
+        c.Div(
+            class_name="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+            components=[
+                _stat_tile(
+                    label="Assigned+ progressed",
+                    value=f"{(funnel.assigned + funnel.in_progress + funnel.completed):,}",
+                    hint=f"{funnel.assign_rate * 100:.1f}% of all rides",
+                ),
+                _stat_tile(
+                    label="Completed rides",
+                    value=f"{funnel.completed:,}",
+                    hint=f"{funnel.completion_rate * 100:.1f}% completion rate",
+                ),
+                _stat_tile(
+                    label="Cancelled rides",
+                    value=f"{funnel.cancelled:,}",
+                    hint=f"{funnel.cancellation_rate * 100:.1f}% cancellation rate",
+                ),
+                _stat_tile(
+                    label="Still bidding",
+                    value=f"{funnel.bidding_open:,}",
+                    hint="Open rides awaiting assignment",
+                ),
+            ],
+        ),
+        c.Heading(text="Bid market health", level=2, class_name=H2),
+        c.Div(
+            class_name="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+            components=[
+                _stat_tile(
+                    label="Avg bids per ride",
+                    value=f"{bid_market.avg_bids_per_ride:.2f}",
+                    hint=f"Median {bid_market.median_bids_per_ride:.1f}",
+                ),
+                _stat_tile(
+                    label="Rides with zero bids",
+                    value=f"{bid_market.rides_with_zero_bids:,}",
+                    hint=f"{bid_market.rides_with_bids:,} rides received bids",
+                ),
+                _stat_tile(
+                    label="Accepted bids",
+                    value=f"{bid_market.accepted_bids:,}",
+                    hint=f"{bid_market.bid_acceptance_rate * 100:.1f}% acceptance rate",
+                ),
+                _stat_tile(
+                    label="Distinct bidding drivers",
+                    value=f"{bid_market.distinct_bidding_drivers:,}",
+                    hint="Unique drivers who submitted at least one bid",
+                ),
+            ],
+        ),
+        c.Heading(text="Fare and revenue quality", level=2, class_name=H2),
+        c.Div(
+            class_name="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+            components=[
+                _stat_tile(
+                    label="Avg completed fare",
+                    value=f"${revenue_metrics.avg_completed_fare_cents / 100.0:,.2f}",
+                    hint=f"Median ${revenue_metrics.median_completed_fare_cents / 100.0:,.2f}",
+                ),
+                _stat_tile(
+                    label="Avg accepted bid",
+                    value=f"${revenue_metrics.avg_accepted_bid_cents / 100.0:,.2f}",
+                    hint=f"Median ${revenue_metrics.median_accepted_bid_cents / 100.0:,.2f}",
+                ),
+                _stat_tile(
+                    label="Final minus accepted",
+                    value=f"${revenue_metrics.avg_final_minus_accepted_cents / 100.0:,.2f}",
+                    hint=f"{revenue_metrics.paired_completed_with_accepted_bid:,} paired completed rides",
+                ),
+                _stat_tile(
+                    label="Completed rides with fares",
+                    value=f"{revenue_metrics.completed_rides_with_fare:,}",
+                    hint="Rows included in fare aggregates",
+                ),
+            ],
+        ),
+        c.Heading(text="Driver activity snapshot", level=2, class_name=H2),
+        c.Div(
+            class_name="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+            components=[
+                _stat_tile(
+                    label="Driver accounts",
+                    value=f"{driver_snapshot.total_driver_accounts:,}",
+                    hint="Total registered users with role=driver",
+                ),
+                _stat_tile(
+                    label="Drivers with location",
+                    value=f"{driver_snapshot.drivers_with_location:,}",
+                    hint="Rows in driver_locations",
+                ),
+                _stat_tile(
+                    label="Active in last 15m",
+                    value=f"{driver_snapshot.drivers_active_last_15m:,}",
+                    hint="GPS updates within 15 minutes",
+                ),
+                _stat_tile(
+                    label="Active in last 60m",
+                    value=f"{driver_snapshot.drivers_active_last_60m:,}",
+                    hint="GPS updates within 60 minutes",
+                ),
+            ],
+        ),
+        c.Heading(text="Demand and cohorts", level=2, class_name=H2),
+        c.Div(
+            class_name="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4",
+            components=[
+                _stat_tile(
+                    label="Fruger pickup events",
+                    value=f"{demand.fruger_pickups_total:,}",
+                    hint="Rows in pickups where source=fruger_app",
+                ),
+            ],
+        ),
         *status_section,
+        *_metric_table("Pickup source split", demand.by_pickup_source),
+        *_metric_table("Pickup demand by hour", demand.by_pickup_hour),
+        *_metric_table("Pickup demand by date (last 30 days)", demand.by_pickup_date_last_30d),
+        *_metric_table("Top dispatch bases", demand.top_bases),
+        *_metric_table("Top geo cells (0.01 precision)", demand.top_geo_cells),
+        *_metric_table("Users by role", metrics.cohorts.users_by_role),
+        *_metric_table("Top riders by ride count", metrics.cohorts.top_riders_by_ride_count),
+        *_metric_table("Top drivers by bid count", metrics.cohorts.top_drivers_by_bid_count),
         *build_nyc_analytics_embedded_sections(
             nyc_overview,
             nyc_error,

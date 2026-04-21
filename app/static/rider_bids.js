@@ -64,7 +64,7 @@
       const rides = await api('/api/v1/rides/me');
       const open = rides.filter((r) => r.status === 'bidding_open');
       if (open.length === 0) {
-        root.innerHTML = '<p>No rides in <code>bidding_open</code> status.</p>';
+        root.innerHTML = '<p>No open rides</p>';
         return;
       }
       const labels = await resolveAddressLabels(open);

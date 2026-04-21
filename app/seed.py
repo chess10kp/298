@@ -389,6 +389,8 @@ def run_seed(db_path: Path) -> None:
             return
 
         conn.commit()
+        cur.execute(f"CREATE INDEX IF NOT EXISTS idx_pickups_lat_lon ON {PICKUPS_TABLE}(lat, lon)")
+        conn.commit()
         cur.execute(f"SELECT COUNT(*) FROM {PICKUPS_TABLE}")
         n = cur.fetchone()[0]
         logger.info("Loaded %s pickup rows into %s.", n, PICKUPS_TABLE)

@@ -80,13 +80,16 @@ class DBSession:
         pickup_lng: float,
         dropoff_lat: float,
         dropoff_lng: float,
+        pickup_location: str | None = None,
+        dropoff_location: str | None = None,
         status: RideStatus = RideStatus.bidding_open,
     ) -> int:
         cur = conn.cursor()
         cur.execute(
             """
-            INSERT INTO rides (rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO live_rides (rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+                                   pickup_location, dropoff_location, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 rider_id,
@@ -94,6 +97,8 @@ class DBSession:
                 pickup_lng,
                 dropoff_lat,
                 dropoff_lng,
+                pickup_location,
+                dropoff_location,
                 status.value,
             ),
         )
@@ -104,9 +109,10 @@ class DBSession:
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+                   pickup_location, dropoff_location,
                    status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
                    driver_marked_complete_at, rider_marked_complete_at
-            FROM rides WHERE id = ?
+            FROM live_rides WHERE id = ?
             """,
             (ride_id,),
         )
@@ -120,26 +126,32 @@ class DBSession:
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+                   pickup_location, dropoff_location,
                    status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
                    driver_marked_complete_at, rider_marked_complete_at
-            FROM rides WHERE rider_id = ? ORDER BY id DESC
+            FROM live_rides WHERE rider_id = ? ORDER BY id DESC
             """,
             (rider_id,),
         )
         return [dict(r) for r in cur.fetchall()]
 
     def list_rides_with_status(
-        self, conn: sqlite3.Connection, status: RideStatus
+        self, conn: sqlite3.Connection, status: RideStatus, *, limit: int = 100
     ) -> list[dict[str, Any]]:
         cur = conn.cursor()
+        safe_limit = max(1, int(limit))
         cur.execute(
             """
             SELECT id, rider_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+                   pickup_location, dropoff_location,
                    status, accepted_bid_id, final_fare_cents, created_at, cancelled_at, completed_at,
                    driver_marked_complete_at, rider_marked_complete_at
-            FROM rides WHERE status = ? ORDER BY id DESC
+            FROM live_rides
+            WHERE status = ?
+            ORDER BY id DESC
+            LIMIT ?
             """,
-            (status.value,),
+            (status.value, safe_limit),
         )
         return [dict(r) for r in cur.fetchall()]
 
@@ -151,9 +163,10 @@ class DBSession:
         cur.execute(
             """
             SELECT r.id, r.rider_id, r.pickup_lat, r.pickup_lng, r.dropoff_lat, r.dropoff_lng,
+                   r.pickup_location, r.dropoff_location,
                    r.status, r.accepted_bid_id, r.final_fare_cents, r.created_at, r.cancelled_at,
                    r.completed_at, r.driver_marked_complete_at, r.rider_marked_complete_at
-            FROM rides r
+            FROM live_rides r
             INNER JOIN bids b ON b.id = r.accepted_bid_id
             WHERE b.driver_id = ? AND r.status IN ('assigned', 'in_progress')
             ORDER BY r.id DESC
@@ -201,12 +214,12 @@ class DBSession:
         if not fields:
             return
         vals.append(ride_id)
-        conn.execute(f"UPDATE rides SET {', '.join(fields)} WHERE id = ?", vals)
+        conn.execute(f"UPDATE live_rides SET {', '.join(fields)} WHERE id = ?", vals)
 
     def clear_ride_completion_marks(self, conn: sqlite3.Connection, ride_id: int) -> None:
         conn.execute(
             """
-            UPDATE rides
+            UPDATE live_rides
             SET driver_marked_complete_at = NULL, rider_marked_complete_at = NULL
             WHERE id = ?
             """,
@@ -377,7 +390,7 @@ class DBSession:
     # --- admin aggregates ---
     def count_rides_total(self, conn: sqlite3.Connection) -> int:
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM rides")
+        cur.execute("SELECT COUNT(*) FROM live_rides")
         return int(cur.fetchone()[0])
 
     def count_pickups_rows(self, conn: sqlite3.Connection) -> int:
@@ -393,7 +406,7 @@ class DBSession:
 
     def count_rides_by_status(self, conn: sqlite3.Connection) -> dict[str, int]:
         cur = conn.cursor()
-        cur.execute("SELECT status, COUNT(*) FROM rides GROUP BY status")
+        cur.execute("SELECT status, COUNT(*) FROM live_rides GROUP BY status")
         return {str(row[0]): int(row[1]) for row in cur.fetchall()}
 
     def completed_revenue_totals(self, conn: sqlite3.Connection) -> tuple[int, int]:
@@ -402,7 +415,7 @@ class DBSession:
         cur.execute(
             """
             SELECT COALESCE(SUM(final_fare_cents), 0), COUNT(*)
-            FROM rides
+            FROM live_rides
             WHERE status = ? AND final_fare_cents IS NOT NULL
             """,
             (RideStatus.completed.value,),

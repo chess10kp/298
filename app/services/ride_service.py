@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from app.schemas.operational import BidStatus, RideCreate, RideOut, RideStatus
 from app.services.db_session import DBSession
 from app.services.operational_pickup_events import try_record_fruger_pickup_for_ride
-from app.services.pickup_dataset_labels import attach_pickup_dataset_labels
+from app.services.pickup_dataset_labels import nearest_pickup_location_label
 
 
 class RideService:
@@ -21,13 +21,15 @@ class RideService:
     def ride_from_row(row: dict, conn: sqlite3.Connection | None = None) -> RideOut:
         dma = row.get("driver_marked_complete_at")
         rma = row.get("rider_marked_complete_at")
-        out = RideOut(
+        return RideOut(
             id=int(row["id"]),
             rider_id=int(row["rider_id"]),
             pickup_lat=float(row["pickup_lat"]),
             pickup_lng=float(row["pickup_lng"]),
             dropoff_lat=float(row["dropoff_lat"]),
             dropoff_lng=float(row["dropoff_lng"]),
+            pickup_location=row.get("pickup_location"),
+            dropoff_location=row.get("dropoff_location"),
             status=RideStatus(str(row["status"])),
             accepted_bid_id=int(row["accepted_bid_id"]) if row["accepted_bid_id"] is not None else None,
             final_fare_cents=int(row["final_fare_cents"]) if row["final_fare_cents"] is not None else None,
@@ -37,9 +39,6 @@ class RideService:
             driver_marked_complete_at=str(dma) if dma is not None else None,
             rider_marked_complete_at=str(rma) if rma is not None else None,
         )
-        if conn is not None:
-            return attach_pickup_dataset_labels(conn, out)
-        return out
 
     def _finalize_completed_ride(self, conn: sqlite3.Connection, ride_id: int, ride: dict) -> RideOut:
         aid = ride["accepted_bid_id"]
@@ -72,6 +71,8 @@ class RideService:
         return self.ride_from_row(row, conn)
 
     def request_ride(self, conn: sqlite3.Connection, rider_id: int, body: RideCreate) -> RideOut:
+        pickup_label = nearest_pickup_location_label(conn, body.pickup_lat, body.pickup_lng)
+        dropoff_label = nearest_pickup_location_label(conn, body.dropoff_lat, body.dropoff_lng)
         rid = self._db.insert_ride(
             conn,
             rider_id=rider_id,
@@ -79,6 +80,8 @@ class RideService:
             pickup_lng=body.pickup_lng,
             dropoff_lat=body.dropoff_lat,
             dropoff_lng=body.dropoff_lng,
+            pickup_location=pickup_label,
+            dropoff_location=dropoff_label,
             status=RideStatus.bidding_open,
         )
         row = self._db.get_ride(conn, rid)
@@ -124,8 +127,8 @@ class RideService:
         rows = self._db.list_rides_for_rider(conn, rider_id)
         return [self.ride_from_row(r, conn) for r in rows]
 
-    def list_open_rides(self, conn: sqlite3.Connection) -> list[RideOut]:
-        rows = self._db.list_rides_with_status(conn, RideStatus.bidding_open)
+    def list_open_rides(self, conn: sqlite3.Connection, *, limit: int = 100) -> list[RideOut]:
+        rows = self._db.list_rides_with_status(conn, RideStatus.bidding_open, limit=limit)
         return [self.ride_from_row(r, conn) for r in rows]
 
     def list_active_rides_for_driver(

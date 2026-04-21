@@ -15,23 +15,6 @@ def build_footer() -> c.Div:
                 class_name="max-w-6xl mx-auto px-4 flex items-center justify-between",
                 components=[
                     c.Text(text="© 2026 Fruger Inc."),
-                    c.Div(
-                        class_name="flex items-center gap-4",
-                        components=[
-                            c.Link(
-                                components=[c.Text(text="Terms")],
-                                on_click=GoToEvent(url="/terms"),
-                            ),
-                            c.Link(
-                                components=[c.Text(text="Privacy")],
-                                on_click=GoToEvent(url="/privacy"),
-                            ),
-                            c.Link(
-                                components=[c.Text(text="Contact")],
-                                on_click=GoToEvent(url="/contact"),
-                            ),
-                        ],
-                    ),
                 ],
             )
         ],

@@ -1,5 +1,5 @@
 (function () {
-  console.log('[Driver] Loading driver.js v7');
+  console.log('[Driver] Loading driver.js v9');
   let watchPosId = null;
 
   async function api(path, opts) {
@@ -60,36 +60,13 @@
     return '<span class="rides-table__mono">' + coords + '</span>';
   }
 
-  // Simple in-memory cache for reverse-geocoding results to avoid repeated
-  // network calls while the page is open. Key is "lat,lng" with 5-decimal
-  // precision to match how coordinates are displayed.
+  // In-memory cache: "lat,lng" (5 decimals) → label. Filled via
+  // /api/v1/geocode/reverse-batch (server calls Nominatim; browser cannot).
   const geocodeCache = {};
+  const REVERSE_BATCH_MAX = 48;
 
-  async function reverseGeocode(lat, lng) {
-    const key = Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5);
-    if (Object.prototype.hasOwnProperty.call(geocodeCache, key)) {
-      return geocodeCache[key];
-    }
-    try {
-      // Use OpenStreetMap Nominatim reverse geocoding (no API key required).
-      // This is suitable for demo/demo-seed usage. For production, use a
-      // server-side geocoder or an API key with usage limits.
-      const url =
-        'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' +
-        encodeURIComponent(lat) +
-        '&lon=' +
-        encodeURIComponent(lng);
-      const r = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!r.ok) throw new Error('Geocode failed');
-      const data = await r.json();
-      const name = data && data.display_name ? data.display_name : null;
-      geocodeCache[key] = name;
-      return name;
-    } catch (e) {
-      // On failure, cache null to avoid repeated failing requests
-      geocodeCache[key] = null;
-      return null;
-    }
+  function coordKey(lat, lng) {
+    return Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5);
   }
 
   async function placeBid(rideId, fareInput) {
@@ -109,28 +86,47 @@
   async function enrichRidePlaceLabels(rides) {
     if (!rides || rides.length === 0) return;
     const toResolve = [];
+    const seen = {};
     rides.forEach(function (ride) {
       try {
         if (!ride.pickup_location && ride.pickup_lat != null && ride.pickup_lng != null) {
-          const key = Number(ride.pickup_lat).toFixed(5) + ',' + Number(ride.pickup_lng).toFixed(5);
-          if (!Object.prototype.hasOwnProperty.call(geocodeCache, key)) toResolve.push({ lat: ride.pickup_lat, lng: ride.pickup_lng });
+          const key = coordKey(ride.pickup_lat, ride.pickup_lng);
+          if (
+            !Object.prototype.hasOwnProperty.call(geocodeCache, key) &&
+            !seen[key]
+          ) {
+            seen[key] = true;
+            toResolve.push({ lat: ride.pickup_lat, lng: ride.pickup_lng });
+          }
         }
         if (!ride.dropoff_location && ride.dropoff_lat != null && ride.dropoff_lng != null) {
-          const key = Number(ride.dropoff_lat).toFixed(5) + ',' + Number(ride.dropoff_lng).toFixed(5);
-          if (!Object.prototype.hasOwnProperty.call(geocodeCache, key)) toResolve.push({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
+          const key = coordKey(ride.dropoff_lat, ride.dropoff_lng);
+          if (
+            !Object.prototype.hasOwnProperty.call(geocodeCache, key) &&
+            !seen[key]
+          ) {
+            seen[key] = true;
+            toResolve.push({ lat: ride.dropoff_lat, lng: ride.dropoff_lng });
+          }
         }
       } catch (_) {}
     });
-    const unique = {};
-    toResolve.forEach(function (p) {
-      unique[Number(p.lat).toFixed(5) + ',' + Number(p.lng).toFixed(5)] = p;
-    });
-    await Promise.all(
-      Object.keys(unique).map(function (k) {
-        const p = unique[k];
-        return reverseGeocode(p.lat, p.lng);
-      }),
-    );
+    if (toResolve.length === 0) return;
+    try {
+      for (let i = 0; i < toResolve.length; i += REVERSE_BATCH_MAX) {
+        const chunk = toResolve.slice(i, i + REVERSE_BATCH_MAX);
+        const res = await api('/api/v1/geocode/reverse-batch', {
+          method: 'POST',
+          body: JSON.stringify({ points: chunk }),
+        });
+        const labels = res && typeof res.labels === 'object' ? res.labels : {};
+        Object.keys(labels).forEach(function (k) {
+          geocodeCache[k] = labels[k];
+        });
+      }
+    } catch (e) {
+      console.warn('[Driver] reverse-batch geocode failed', e);
+    }
   }
 
   async function buildTable(rides) {
@@ -146,10 +142,18 @@
         esc(ride.id) +
         '</span></td>' +
         '<td>' +
-        locCell(ride.pickup_lat, ride.pickup_lng, ride.pickup_location || geocodeCache[Number(ride.pickup_lat).toFixed(5) + ',' + Number(ride.pickup_lng).toFixed(5)]) +
+        locCell(
+          ride.pickup_lat,
+          ride.pickup_lng,
+          ride.pickup_location || geocodeCache[coordKey(ride.pickup_lat, ride.pickup_lng)],
+        ) +
         '</td>' +
         '<td>' +
-        locCell(ride.dropoff_lat, ride.dropoff_lng, ride.dropoff_location || geocodeCache[Number(ride.dropoff_lat).toFixed(5) + ',' + Number(ride.dropoff_lng).toFixed(5)]) +
+        locCell(
+          ride.dropoff_lat,
+          ride.dropoff_lng,
+          ride.dropoff_location || geocodeCache[coordKey(ride.dropoff_lat, ride.dropoff_lng)],
+        ) +
         '</td>' +
         '<td class="rides-table__time rides-table__mono">' +
         esc(fmtTime(ride.created_at)) +
@@ -220,10 +224,18 @@
         esc(ride.id) +
         '</span></td>' +
         '<td>' +
-        locCell(ride.pickup_lat, ride.pickup_lng, ride.pickup_location || geocodeCache[Number(ride.pickup_lat).toFixed(5) + ',' + Number(ride.pickup_lng).toFixed(5)]) +
+        locCell(
+          ride.pickup_lat,
+          ride.pickup_lng,
+          ride.pickup_location || geocodeCache[coordKey(ride.pickup_lat, ride.pickup_lng)],
+        ) +
         '</td>' +
         '<td>' +
-        locCell(ride.dropoff_lat, ride.dropoff_lng, ride.dropoff_location || geocodeCache[Number(ride.dropoff_lat).toFixed(5) + ',' + Number(ride.dropoff_lng).toFixed(5)]) +
+        locCell(
+          ride.dropoff_lat,
+          ride.dropoff_lng,
+          ride.dropoff_location || geocodeCache[coordKey(ride.dropoff_lat, ride.dropoff_lng)],
+        ) +
         '</td>' +
         '<td class="rides-table__mono">' +
         esc(ride.status) +

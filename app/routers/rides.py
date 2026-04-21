@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.deps import Conn, CurrentUser, DriverUser, RiderUser, get_db_session
 from app.schemas.operational import (
@@ -54,8 +54,13 @@ def my_rides(conn: Conn, rider: RiderUser, rides: Rs) -> list[RideOut]:
 
 
 @router.get("/open", response_model=list[RideOut])
-def open_rides(conn: Conn, _: DriverUser, rides: Rs) -> list[RideOut]:
-    return rides.list_open_rides(conn)
+def open_rides(
+    conn: Conn,
+    _: DriverUser,
+    rides: Rs,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[RideOut]:
+    return rides.list_open_rides(conn, limit=limit)
 
 
 @router.get("/driver/active", response_model=list[RideOut])

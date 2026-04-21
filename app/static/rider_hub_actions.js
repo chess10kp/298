@@ -107,7 +107,10 @@
             ? data.detail
             : JSON.stringify(data.detail)
           : r.statusText;
-      throw new Error(detail);
+      const err = new Error(detail);
+      err.status = r.status;
+      err.detail = detail;
+      throw err;
     }
     return data;
   }
@@ -220,7 +223,7 @@
     if (!root) return;
     if (bids.length === 0) {
       root.innerHTML =
-        '<p class="body-sm muted" style="margin:0;">No offers yet — we’ll show each bid here as drivers respond.</p>';
+        '<p class="body-sm muted" style="margin:0;">No offers yet </p>';
       return;
     }
     root.innerHTML =
@@ -284,7 +287,19 @@
           return;
         }
       } catch (e) {
-        if (msg) setMsg(msg, String(e.message || e), false);
+        // If the ride was removed or no longer accessible, stop polling this stale ID.
+        const detail = String(e && (e.detail || e.message) ? e.detail || e.message : e);
+        const isGone = (e && e.status === 404) || /ride not found/i.test(detail);
+        if (isGone) {
+          stopBidPolling();
+          hideWaitingUi();
+          if (msg) setMsg(msg, `Ride #${rideId} is no longer available.`, false);
+          try {
+            fetchAndRenderMyRides();
+          } catch (_) {}
+          return;
+        }
+        if (msg) setMsg(msg, detail, false);
       }
     };
     tick();

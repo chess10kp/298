@@ -14,6 +14,7 @@ from app.admin_dashboard import build_admin_dashboard
 from app.analytics_queries import fetch_overview
 from app.admin_plots import revenue_by_day_png
 from app.deps import AdminUser, Conn, get_db_session
+from app.schemas.admin_metrics import AdminMetricsOut
 from app.schemas.operational import AdminStatsOut, DriverLocationOut, UserPublic
 from app.services.admin_service import AdminService
 from app.services.db_session import DBSession
@@ -82,6 +83,11 @@ def revenue_plot(conn: Conn, _: AdminUser, svc: Asvc) -> Response:
     return Response(content=png, media_type="image/png")
 
 
+@router.get("/metrics", response_model=AdminMetricsOut)
+def admin_metrics(conn: Conn, _: AdminUser, svc: Asvc) -> AdminMetricsOut:
+    return svc.operational_metrics(conn)
+
+
 def admin_dashboard_fastui_json(
     conn: Conn,
     user: UserPublic,
@@ -90,6 +96,7 @@ def admin_dashboard_fastui_json(
 ) -> JSONResponse:
     """Shared FastUI tree for admin console (also served at ``/api/admin/dashboard``)."""
     stats = svc.overview_stats(conn)
+    metrics = svc.operational_metrics(conn)
     nyc_overview = None
     nyc_err = None
     if app_config.DB_PATH.is_file():
@@ -103,6 +110,7 @@ def admin_dashboard_fastui_json(
     return _fastui_json(
         build_admin_dashboard(
             stats,
+            metrics,
             user,
             nyc_overview=nyc_overview,
             nyc_error=nyc_err,

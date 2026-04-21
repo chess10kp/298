@@ -168,7 +168,7 @@ def seed_operational_demo_if_empty(conn: sqlite3.Connection) -> None:
     if not app_config.AUTO_OPERATIONAL_DEMO_SEED:
         return
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM rides")
+    cur.execute("SELECT COUNT(*) FROM live_rides")
     if int(cur.fetchone()[0]) > 0:
         return
 

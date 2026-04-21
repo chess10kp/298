@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 5
 
 
 def _get_user_version(conn: sqlite3.Connection) -> int:
@@ -35,6 +35,14 @@ def migrate(conn: sqlite3.Connection) -> None:
         _migrate_3_dual_completion(conn)
         _set_user_version(conn, 3)
         v = 3
+    if v < 4:
+        _migrate_4_pickups_lat_lon_index(conn)
+        _set_user_version(conn, 4)
+        v = 4
+    if v < 5:
+        _migrate_5_ride_location_labels(conn)
+        _set_user_version(conn, 5)
+        v = 5
     if v != CURRENT_SCHEMA_VERSION:
         logger.warning(
             "Schema version %s is behind code version %s; migrations may need updating.",
@@ -60,11 +68,11 @@ def operational_tables_present(conn: sqlite3.Connection) -> bool:
     cur.execute(
         """
         SELECT name FROM sqlite_master
-        WHERE type='table' AND name IN ('users', 'rides', 'bids', 'driver_locations')
+        WHERE type='table' AND name IN ('users', 'live_rides', 'bids', 'driver_locations')
         """
     )
     found = {row[0] for row in cur.fetchall()}
-    return found == {"users", "rides", "bids", "driver_locations"}
+    return found == {"users", "live_rides", "bids", "driver_locations"}
 
 
 def _migrate_1_operational(conn: sqlite3.Connection) -> None:
@@ -78,13 +86,15 @@ def _migrate_1_operational(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS rides (
+        CREATE TABLE IF NOT EXISTS live_rides (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             rider_id INTEGER NOT NULL REFERENCES users(id),
             pickup_lat REAL NOT NULL,
             pickup_lng REAL NOT NULL,
             dropoff_lat REAL NOT NULL,
             dropoff_lng REAL NOT NULL,
+            pickup_location TEXT,
+            dropoff_location TEXT,
             status TEXT NOT NULL CHECK (
                 status IN ('bidding_open', 'assigned', 'in_progress', 'completed', 'cancelled')
             ),
@@ -95,9 +105,25 @@ def _migrate_1_operational(conn: sqlite3.Connection) -> None:
             completed_at TEXT
         );
 
+        -- Admin-only seeded/archival rides (kept separate from live rider/driver flow).
+        CREATE TABLE IF NOT EXISTS seed_rides (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rider_id INTEGER,
+            pickup_lat REAL NOT NULL,
+            pickup_lng REAL NOT NULL,
+            dropoff_lat REAL NOT NULL,
+            dropoff_lng REAL NOT NULL,
+            status TEXT,
+            accepted_bid_id INTEGER,
+            final_fare_cents INTEGER,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            cancelled_at TEXT,
+            completed_at TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS bids (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ride_id INTEGER NOT NULL REFERENCES rides(id) ON DELETE CASCADE,
+            ride_id INTEGER NOT NULL REFERENCES live_rides(id) ON DELETE CASCADE,
             driver_id INTEGER NOT NULL REFERENCES users(id),
             fare_cents INTEGER NOT NULL,
             distance_to_pickup_m REAL NOT NULL,
@@ -113,11 +139,14 @@ def _migrate_1_operational(conn: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
-        CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id);
+        CREATE INDEX IF NOT EXISTS idx_live_rides_status ON live_rides(status);
+        CREATE INDEX IF NOT EXISTS idx_live_rides_rider ON live_rides(rider_id);
+        CREATE INDEX IF NOT EXISTS idx_live_rides_created ON live_rides(created_at);
+        CREATE INDEX IF NOT EXISTS idx_live_rides_status_id ON live_rides(status, id DESC);
         CREATE INDEX IF NOT EXISTS idx_bids_ride ON bids(ride_id);
         CREATE INDEX IF NOT EXISTS idx_bids_driver ON bids(driver_id);
-        CREATE INDEX IF NOT EXISTS idx_rides_created ON rides(created_at);
+        CREATE INDEX IF NOT EXISTS idx_seed_rides_status ON seed_rides(status);
+        CREATE INDEX IF NOT EXISTS idx_seed_rides_created ON seed_rides(created_at);
         """
     )
 
@@ -141,19 +170,19 @@ def _migrate_2_pickups_source(conn: sqlite3.Connection) -> None:
 def _migrate_3_dual_completion(conn: sqlite3.Connection) -> None:
     """Driver and rider must both confirm before status becomes completed."""
     cur = conn.cursor()
-    cur.execute("PRAGMA table_info(rides)")
+    cur.execute("PRAGMA table_info(live_rides)")
     cols = {row[1] for row in cur.fetchall()}
     if "driver_marked_complete_at" not in cols:
         conn.execute(
-            "ALTER TABLE rides ADD COLUMN driver_marked_complete_at TEXT"
+            "ALTER TABLE live_rides ADD COLUMN driver_marked_complete_at TEXT"
         )
     if "rider_marked_complete_at" not in cols:
         conn.execute(
-            "ALTER TABLE rides ADD COLUMN rider_marked_complete_at TEXT"
+            "ALTER TABLE live_rides ADD COLUMN rider_marked_complete_at TEXT"
         )
     conn.execute(
         """
-        UPDATE rides
+        UPDATE live_rides
         SET driver_marked_complete_at = completed_at,
             rider_marked_complete_at = completed_at
         WHERE status = 'completed'
@@ -161,3 +190,25 @@ def _migrate_3_dual_completion(conn: sqlite3.Connection) -> None:
           AND driver_marked_complete_at IS NULL
         """
     )
+
+
+def _migrate_4_pickups_lat_lon_index(conn: sqlite3.Connection) -> None:
+    """Add spatial index on pickups(lat, lon) to speed up nearest-neighbor queries."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='pickups' LIMIT 1"
+    )
+    if cur.fetchone() is None:
+        return
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pickups_lat_lon ON pickups(lat, lon)")
+
+
+def _migrate_5_ride_location_labels(conn: sqlite3.Connection) -> None:
+    """Store pickup/dropoff location labels directly on live_rides."""
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(live_rides)")
+    cols = {row[1] for row in cur.fetchall()}
+    if "pickup_location" not in cols:
+        conn.execute("ALTER TABLE live_rides ADD COLUMN pickup_location TEXT")
+    if "dropoff_location" not in cols:
+        conn.execute("ALTER TABLE live_rides ADD COLUMN dropoff_location TEXT")

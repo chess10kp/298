@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
     try:
         if not operational_tables_present(conn):
             logger.error(
-                "Operational tables missing after migration. Expected users, rides, bids, "
+                "Operational tables missing after migration. Expected users, live_rides, bids, "
                 "driver_locations in %s",
                 db_path.resolve(),
             )

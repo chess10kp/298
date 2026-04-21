@@ -18,7 +18,14 @@ _last_request_mono = 0.0
 
 
 def coord_key(lat: float, lng: float) -> str:
-    return f"{round(float(lat), 5)},{round(float(lng), 5)}"
+    """Match browser ``Number(lat).toFixed(5) + ',' + Number(lng).toFixed(5)``."""
+    return f"{float(lat):.5f},{float(lng):.5f}"
+
+
+def nominatim_cached_label(lat: float, lng: float) -> str | None:
+    """Return a cached Nominatim label if available, without making a network call."""
+    key = coord_key(lat, lng)
+    return _cache.get(key)
 
 
 def nominatim_reverse_display_name(lat: float, lng: float, *, timeout: float = 10.0) -> str | None:
